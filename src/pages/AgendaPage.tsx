@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { storage } from '../lib/storage';
 import { toast } from 'sonner';
+import { formatDate } from '../lib/dateUtils';
 
 export default function AgendaPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -87,7 +88,7 @@ export default function AgendaPage() {
               ) : filteredExames.map((exame) => (
                 <tr key={exame.id} className="hover:bg-white/[0.02] transition-colors group">
                   <td className="px-6 py-4 font-mono font-bold text-white/70">
-                    {new Date(exame.data).toLocaleDateString('pt-BR')}
+                    {formatDate(exame.data)}
                   </td>
                   <td className="px-6 py-4 flex items-center gap-2 font-medium">
                     <Clock size={14} className="text-primary" />

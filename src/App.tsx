@@ -15,7 +15,8 @@ import {
   Settings,
   Bell,
   Search,
-  Wallet
+  Wallet,
+  Package
 } from 'lucide-react';
 import DashboardPage from './pages/DashboardPage';
 import ClientsPage from './pages/ClientsPage';
@@ -23,6 +24,7 @@ import SalesPage from './pages/SalesPage';
 import AgendaPage from './pages/AgendaPage';
 import CaixaPage from './pages/CaixaPage';
 import FinanceiroPage from './pages/FinanceiroPage';
+import InventoryPage from './pages/InventoryPage';
 import FiscalPage from './pages/FiscalPage';
 import SettingsPage from './pages/SettingsPage';
 import LoginPage from './pages/LoginPage';
@@ -79,6 +81,12 @@ function Layout() {
             icon={<TrendingUp size={20} />} 
             label="Financeiro" 
             active={location.pathname === '/financeiro'} 
+          />
+          <NavItem 
+            to="/estoque" 
+            icon={<Package size={20} />} 
+            label="Produtos & Estoque" 
+            active={location.pathname === '/estoque'} 
           />
           <NavItem 
             to="/fiscal" 
@@ -182,6 +190,7 @@ function App() {
           <Route path="agenda" element={<AgendaPage />} />
           <Route path="caixa" element={<CaixaPage />} />
           <Route path="financeiro" element={<FinanceiroPage />} />
+          <Route path="estoque" element={<InventoryPage />} />
           <Route path="fiscal" element={<FiscalPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="*" element={<div className="flex items-center justify-center h-full text-white/20 italic">Módulo em desenvolvimento...</div>} />

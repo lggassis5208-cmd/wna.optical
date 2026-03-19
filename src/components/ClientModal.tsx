@@ -7,7 +7,8 @@ import {
   Phone, 
   ShieldCheck,
   Search,
-  Loader2
+  Loader2,
+  Clock
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { storage } from '../lib/storage';
@@ -28,7 +29,8 @@ export default function ClientModal({ isOpen, onClose }: ClientModalProps) {
     bairro: '',
     cidade: '',
     uf: '',
-    numero: ''
+    numero: '',
+    data_nascimento: ''
   });
 
   useEffect(() => {
@@ -142,6 +144,20 @@ export default function ClientModal({ isOpen, onClose }: ClientModalProps) {
                   value={formData.whatsapp}
                   onChange={(e) => setFormData({...formData, whatsapp: e.target.value})}
                 />
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-white/40 ml-1">Data de Nascimento</label>
+                  <div className="relative">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20">
+                      <Clock size={16} />
+                    </div>
+                    <input 
+                      type="date" 
+                      className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:border-primary/50 transition-colors text-white"
+                      value={formData.data_nascimento}
+                      onChange={(e) => setFormData({...formData, data_nascimento: e.target.value})}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 

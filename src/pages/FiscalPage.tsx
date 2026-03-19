@@ -24,7 +24,12 @@ export default function FiscalPage() {
     cofins: '3.00',
     valor_total: '',
     emitente_cnpj: '',
-    emitente_ie: ''
+    emitente_ie: '',
+    cliente_doc: '',
+    rua: '',
+    numero: '',
+    bairro: '',
+    cidade: ''
   });
 
   useEffect(() => {
@@ -61,6 +66,33 @@ export default function FiscalPage() {
     };
     checkStatus();
   }, []);
+
+  const validateFiscalData = () => {
+    const errors: string[] = [];
+    
+    // Validar CPF/CNPJ
+    const docDigits = formData.cliente_doc.replace(/\D/g, '');
+    if (docDigits.length !== 11 && docDigits.length !== 14) {
+      errors.push('CPF ou CNPJ do cliente deve ter 11 ou 14 dígitos.');
+    }
+
+    // Validar NCM
+    const ncmDigits = formData.ncm.replace(/\D/g, '');
+    if (ncmDigits.length !== 8) {
+      errors.push('O NCM do produto deve ter exatamente 8 dígitos.');
+    }
+
+    // Validar Endereço
+    if (!formData.rua.trim()) errors.push('Informe a Rua do destinatário.');
+    if (!formData.numero.trim()) errors.push('Informe o Número do endereço.');
+    if (!formData.bairro.trim()) errors.push('Informe o Bairro do destinatário.');
+    if (!formData.cidade.trim()) errors.push('Informe a Cidade do destinatário.');
+
+    return errors;
+  };
+
+  const errosImpeditivos = validateFiscalData();
+  const formsValido = errosImpeditivos.length === 0 && Number(formData.valor_total) > 0;
 
   const handleTransmitir = async () => {
     try {
@@ -155,6 +187,50 @@ export default function FiscalPage() {
 
            <section className="bg-surface rounded-3xl border border-white/5 p-8 space-y-6">
               <div className="flex items-center gap-3 border-b border-white/5 pb-4 mb-4">
+                 <Building2 className="text-primary" size={24} />
+                 <h3 className="text-xl font-bold">Informações do Destinatário</h3>
+              </div>
+
+              <div className="grid grid-cols-1 gap-6">
+                 <FiscalInput 
+                   label="CPF ou CNPJ do Cliente" 
+                   placeholder="Somente números"
+                   value={formData.cliente_doc} 
+                   onChange={(v) => setFormData({...formData, cliente_doc: v})}
+                 />
+              </div>
+
+              <div className="grid grid-cols-3 gap-6">
+                 <div className="col-span-2">
+                   <FiscalInput 
+                     label="Logradouro / Rua" 
+                     value={formData.rua} 
+                     onChange={(v) => setFormData({...formData, rua: v})}
+                   />
+                 </div>
+                 <FiscalInput 
+                   label="Nº" 
+                   value={formData.numero} 
+                   onChange={(v) => setFormData({...formData, numero: v})}
+                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-6">
+                 <FiscalInput 
+                   label="Bairro" 
+                   value={formData.bairro} 
+                   onChange={(v) => setFormData({...formData, bairro: v})}
+                 />
+                 <FiscalInput 
+                   label="Município / Cidade" 
+                   value={formData.cidade} 
+                   onChange={(v) => setFormData({...formData, cidade: v})}
+                 />
+              </div>
+           </section>
+
+           <section className="bg-surface rounded-3xl border border-white/5 p-8 space-y-6">
+              <div className="flex items-center gap-3 border-b border-white/5 pb-4 mb-4">
                  <Hash className="text-primary" size={24} />
                  <h3 className="text-xl font-bold">Impostos e Tributação</h3>
               </div>
@@ -201,8 +277,22 @@ export default function FiscalPage() {
                  <SummaryLine label="Total Impostos" value={`R$ ${totalImpostos}`} />
               </div>
 
+               {errosImpeditivos.length > 0 && (
+                 <div className="mb-6 bg-red-500/10 border border-red-500/20 p-4 rounded-xl">
+                    <p className="text-[10px] font-black text-red-500 uppercase tracking-widest mb-2 flex items-center gap-2">
+                       <AlertCircle size={14} />
+                       Erros Impeditivos
+                    </p>
+                    <ul className="space-y-1">
+                       {errosImpeditivos.map((err, i) => (
+                         <li key={i} className="text-[10px] text-red-400 font-medium list-disc ml-3">{err}</li>
+                       ))}
+                    </ul>
+                 </div>
+               )}
+
               <button 
-                disabled={!caixaAtivo || loading}
+                disabled={!caixaAtivo || loading || !formsValido}
                 onClick={handleTransmitir}
                 className="w-full bg-primary text-black font-black py-4 rounded-2xl shadow-lg shadow-primary/20 hover:scale-[1.02] transition-all active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed"
               >

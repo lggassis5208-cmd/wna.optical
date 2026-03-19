@@ -10,10 +10,14 @@ import {
   Loader2,
   Lock,
   Printer,
-  CheckCircle2
+  CheckCircle2,
+  MessageSquare,
+  Gift
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { storage } from '../lib/storage';
+import { getNowISO } from '../lib/dateUtils';
+import { openWhatsApp } from '../lib/whatsappUtils';
 import PrintOS from './PrintOS';
 
 interface SaleModalProps {
@@ -29,6 +33,7 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
   const [settings, setSettings] = useState<any>(null);
   const [savedSale, setSavedSale] = useState<any>(null);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [client, setClient] = useState<any>(null);
   
   const initialState = {
     cliente_id: '',
@@ -43,6 +48,7 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
     oe_eixo: '',
     oe_dnp: '',
     oe_adicao: '',
+    is_birthday_discount: false,
     valor_base: '1000.00',
     desconto: '0.00',
     valor_total: '1000.00',
@@ -55,9 +61,14 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
   useEffect(() => {
     const base = parseFloat(formData.valor_base) || 0;
     const desc = parseFloat(formData.desconto) || 0;
-    const total = Math.max(0, base - desc).toFixed(2);
-    setFormData(prev => ({ ...prev, valor_total: total }));
-  }, [formData.valor_base, formData.desconto]);
+    let total = Math.max(0, base - desc);
+    
+    if (formData.is_birthday_discount) {
+      total = total * 0.9; // 10% off
+    }
+    
+    setFormData(prev => ({ ...prev, valor_total: total.toFixed(2) }));
+  }, [formData.valor_base, formData.desconto, formData.is_birthday_discount]);
 
   const checkCaixa = async () => {
     setCheckingCaixa(true);
@@ -76,9 +87,9 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
     setCheckingCaixa(false);
   };
 
-  useState(() => {
+  useEffect(() => {
     if (isOpen) checkCaixa();
-  });
+  }, [isOpen]);
 
   const handleSave = async () => {
     setLoading(true);
@@ -96,13 +107,21 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
         oe_dnp: parseFloat(formData.oe_dnp) || 0,
         oe_adicao: parseFloat(formData.oe_adicao) || 0,
         valor_total: parseFloat(formData.valor_total) || 0,
-        criado_em: new Date().toISOString()
+        criado_em: getNowISO()
       };
 
       const result = await storage.registrarVenda(saleToSave);
 
       toast.success('Venda Salva com Sucesso');
       setSavedSale(result);
+      
+      // Buscar dados do cliente para o WhatsApp
+      if (formData.cliente_id) {
+        const clients = await storage.getClients();
+        const c = clients.find((cl: any) => cl.id === formData.cliente_id);
+        setClient(c);
+      }
+
       setIsSuccess(true);
     } catch (error: any) {
       toast.error('Erro ao salvar venda');
@@ -256,6 +275,20 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
                       <option className="bg-surface">Dinheiro</option>
                       <option className="bg-surface">Crediário Lis</option>
                     </select>
+
+                    <div className="flex items-center gap-2 pt-2">
+                       <input 
+                         type="checkbox" 
+                         id="birthday-discount"
+                         className="w-4 h-4 rounded border-white/10 bg-white/5 text-primary focus:ring-primary/50"
+                         checked={formData.is_birthday_discount}
+                         onChange={(e) => setFormData({...formData, is_birthday_discount: e.target.checked})}
+                       />
+                       <label htmlFor="birthday-discount" className="text-sm text-primary font-bold flex items-center gap-1.5">
+                         <Gift size={16} />
+                         Desconto Aniversário (10%)
+                       </label>
+                    </div>
                  </div>
                  <div className="space-y-4">
                     <h4 className="text-xs font-bold text-white/20 uppercase tracking-widest border-b border-white/5 pb-2">Valores e Ajustes</h4>
@@ -305,6 +338,21 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
                   Concluir
                 </button>
               </div>
+
+              {client?.whatsapp && (
+                <div className="mt-6 animate-in slide-in-from-bottom-4 duration-500">
+                  <button 
+                    onClick={() => openWhatsApp(
+                      client.whatsapp,
+                      `Olá, ${client.name}! Segue o comprovante da sua compra na Ótica Lis:\n\nO.S: ${savedSale?.os_number}\nValor: R$ ${savedSale?.valor_total}\n\nMuito obrigado pela confiança! 👓✨`
+                    )}
+                    className="flex items-center gap-2 text-green-500 font-bold hover:underline"
+                  >
+                    <MessageSquare size={18} />
+                    Enviar Comprovante via WhatsApp
+                  </button>
+                </div>
+              )}
 
               {savedSale && settings && (
                 <PrintOS sale={savedSale} settings={settings} />

@@ -256,6 +256,17 @@ export const storage = {
     const caixa = await this.getCaixaAtual();
     if (!caixa) throw new Error('É necessário abrir o caixa antes de emitir uma nota fiscal.');
 
+    // --- SIMULAÇÃO TRANSMISSÃO SEFAZ ---
+    // Simula atraso de rede/processamento da SEFAZ
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    // Simula erro de CNPJ Inválido se o documento for composto por zeros
+    const docDigits = (nota.cliente_doc || '').replace(/\D/g, '');
+    if (docDigits === '00000000000' || docDigits === '00000000000000') {
+      throw new Error('Erro SEFAZ (Rejeição 207): CNPJ do Destinatário Inválido.');
+    }
+    // -----------------------------------
+
     // 1. Salva a Nota Fiscal
     const novaNota = await this.saveNotaFiscal(nota);
 
@@ -265,12 +276,9 @@ export const storage = {
     
     if (caixaIndex !== -1) {
       const valor = Number(nota.valor_total || 0);
-      // Por padrão, notas manuais entram como faturamento geral no cartão/pix se não especificado
-      // Mas aqui vamos apenas registrar no total de vendas do caixa para o gráfico
       if (!todosCaixas[caixaIndex].notas) todosCaixas[caixaIndex].notas = [];
       todosCaixas[caixaIndex].notas.push(novaNota.id);
       
-      // Se a nota tiver valor, somamos no faturamento do dia (vamos usar pix como padrão se manual)
       todosCaixas[caixaIndex].entradas.pix += valor;
       
       localStorage.setItem('lis_caixas', JSON.stringify(todosCaixas));
@@ -282,11 +290,35 @@ export const storage = {
       valor: nota.valor_total || 0,
       vencimento: new Date().toISOString(),
       categoria: 'Venda Fiscal',
-      status: 'PAGO', // Notas fiscais geralmente representam operações já liquidadas ou faturadas
+      status: 'PAGO',
       nota_id: novaNota.id
     });
 
     return novaNota;
+  },
+
+  // --- PRODUTOS & ESTOQUE ---
+  async getProducts() {
+    return JSON.parse(localStorage.getItem('lis_produtos') || '[]');
+  },
+
+  async saveProduct(product: any) {
+    const products = await this.getProducts();
+    const newProduct = { 
+      ...product, 
+      id: product.id || Math.random().toString(36).substr(2, 9),
+      criado_em: product.criado_em || new Date().toISOString()
+    };
+    
+    const index = products.findIndex((p: any) => p.id === newProduct.id);
+    if (index !== -1) {
+      products[index] = newProduct;
+    } else {
+      products.push(newProduct);
+    }
+    
+    localStorage.setItem('lis_produtos', JSON.stringify(products));
+    return newProduct;
   },
 
   // --- CONFIGURAÇÕES ---

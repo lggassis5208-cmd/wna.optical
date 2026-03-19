@@ -4,11 +4,16 @@ import {
   Search, 
   MoreVertical, 
   Mail, 
-  MessageSquare,
-  ShieldCheck
+  MessageSquare, 
+  ShieldCheck,
+  Upload
 } from 'lucide-react';
+import { toast } from 'sonner';
 import ClientModal from '../components/ClientModal';
 import { storage } from '../lib/storage';
+import { formatDate, getNowISO } from '../lib/dateUtils';
+
+import Papa from 'papaparse';
 
 export default function ClientsPage() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -20,9 +25,97 @@ export default function ClientsPage() {
     setClients(data);
   };
 
+  const handleImportCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    Papa.parse(file, {
+      header: false, // Vamos processar manualmente para pular o "lixo" no topo
+      skipEmptyLines: true,
+      complete: async (results) => {
+        try {
+          const rows = results.data as string[][];
+          if (rows.length < 1) return toast.error('Arquivo vazio.');
+
+          // 1. Encontrar a linha do cabeçalho (Skip Trash)
+          let headerRowIndex = -1;
+          const headerKeywords = ['nome', 'cpf', 'cnpj', 'fone', 'telefone', 'celular', 'cliente'];
+          
+          for (let i = 0; i < rows.length; i++) {
+            const row = rows[i].map(v => String(v).toLowerCase().trim());
+            if (row.some(cell => headerKeywords.some(kw => cell.includes(kw)))) {
+              headerRowIndex = i;
+              break;
+            }
+          }
+
+          if (headerRowIndex === -1) {
+            return toast.error('Não foi possível encontrar o cabeçalho (campos Nome, CPF ou Telefone).');
+          }
+
+          const headers = rows[headerRowIndex].map(h => String(h).toLowerCase().trim());
+          const findCol = (keywords: string[]) => headers.findIndex(h => keywords.some(kw => h.includes(kw)));
+
+          const nomeCol = findCol(['nome', 'cliente', 'razão']);
+          const cpfCol = findCol(['cpf', 'cnpj', 'documento']);
+          const telCol = findCol(['fone', 'telefone', 'celular', 'whatsapp']);
+          const dataCol = findCol(['data', 'nascimento', 'cadastro']);
+
+          let importedCount = 0;
+
+          // 2. Processar dados a partir da linha após o cabeçalho
+          for (let i = headerRowIndex + 1; i < rows.length; i++) {
+            const row = rows[i];
+            if (!row[nomeCol]) continue;
+
+            // Limpeza de CPF
+            let cpf = row[cpfCol] ? String(row[cpfCol]).replace(/\D/g, '') : '';
+            
+            // Limpeza de Telefone (whatsapp)
+            let whatsapp = row[telCol] ? String(row[telCol]).trim() : '';
+
+            // Limpeza/Formatação de Data (Ex: 05012024 -> 05/01/2024)
+            let metadata: any = {};
+            if (dataCol !== -1 && row[dataCol]) {
+              let dateStr = String(row[dataCol]).replace(/\D/g, '');
+              if (dateStr.length === 8) {
+                dateStr = `${dateStr.substring(0,2)}/${dateStr.substring(2,4)}/${dateStr.substring(4,8)}`;
+                metadata.data_importada = dateStr;
+              }
+            }
+
+            await storage.saveClient({
+              name: String(row[nomeCol]).trim(),
+              cpf: cpf,
+              whatsapp: whatsapp,
+              metadata: metadata,
+              lis_score: 850,
+              criado_em: getNowISO()
+            });
+            importedCount++;
+          }
+
+          toast.success(`Importação Concluída: ${importedCount} clientes.`, {
+            description: 'A base foi atualizada com sucesso.'
+          });
+          fetchClients();
+        } catch (err) {
+          toast.error('Erro ao processar as linhas do CSV.');
+          console.error(err);
+        }
+      },
+      error: (err) => {
+        toast.error('Erro ao abrir o arquivo CSV.');
+        console.error(err);
+      }
+    });
+
+    e.target.value = '';
+  };
+
   useEffect(() => {
     fetchClients();
-  }, [isModalOpen]); // Refresh when modal closes
+  }, [isModalOpen]);
 
   const filteredClients = clients.filter(c => 
     c.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -36,13 +129,25 @@ export default function ClientsPage() {
           <h2 className="text-2xl font-bold">Clientes</h2>
           <p className="text-white/40 text-sm">Gerencie sua base de clientes premium</p>
         </div>
-        <button 
-          onClick={() => setIsModalOpen(true)}
-          className="bg-primary text-black font-bold px-6 py-2.5 rounded-xl flex items-center gap-2 hover:shadow-lg hover:shadow-primary/20 transition-all active:scale-95"
-        >
-          <Plus size={20} />
-          Novo Cliente
-        </button>
+        <div className="flex gap-3">
+          <label className="bg-white/5 text-white/70 font-bold px-6 py-2.5 rounded-xl flex items-center gap-2 hover:bg-white/10 transition-all active:scale-95 cursor-pointer border border-white/10">
+            <Upload size={20} className="text-primary" />
+            Importar CSV
+            <input 
+              type="file" 
+              accept=".csv" 
+              className="hidden" 
+              onChange={handleImportCSV} 
+            />
+          </label>
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="bg-primary text-black font-bold px-6 py-2.5 rounded-xl flex items-center gap-2 hover:shadow-lg hover:shadow-primary/20 transition-all active:scale-95"
+          >
+            <Plus size={20} />
+            Novo Cliente
+          </button>
+        </div>
       </div>
 
       <ClientModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
@@ -110,7 +215,7 @@ export default function ClientsPage() {
                   </td>
                   <td className="px-6 py-4">
                     <p className="text-sm font-medium text-white/40">
-                      {client.criado_em ? new Date(client.criado_em).toLocaleDateString() : '---'}
+                      {client.criado_em ? formatDate(client.criado_em) : '---'}
                     </p>
                   </td>
                   <td className="px-6 py-4 text-right">

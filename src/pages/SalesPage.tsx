@@ -9,11 +9,14 @@ import {
   AlertCircle,
   MoreVertical,
   FileText,
-  Printer
+  Printer,
+  MessageSquare
 } from 'lucide-react';
 import SaleModal from '../components/SaleModal';
 import PrintOS from '../components/PrintOS';
 import { storage } from '../lib/storage';
+import { formatDate } from '../lib/dateUtils';
+import { openWhatsApp } from '../lib/whatsappUtils';
 
 export default function SalesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -23,11 +26,23 @@ export default function SalesPage() {
   const [activeSale, setActiveSale] = useState<any>(null);
 
   const fetchSales = async () => {
-    const [salesData, settingsData] = await Promise.all([
+    const [salesData, settingsData, clientsData] = await Promise.all([
       storage.getSales(),
-      storage.getSettings()
+      storage.getSettings(),
+      storage.getClients()
     ]);
-    setSales(salesData);
+
+    // Enriquecer vendas com dados do cliente
+    const enrichedSales = salesData.map((s: any) => {
+      const client = clientsData.find((c: any) => c.id === s.cliente_id || c.cpf === s.paciente_cpf);
+      return {
+        ...s,
+        cliente_nome: client?.name || s.paciente_nome || s.tecnico || 'Cliente',
+        cliente_whatsapp: client?.whatsapp || s.paciente_whatsapp || ''
+      };
+    });
+
+    setSales(enrichedSales);
     setSettings(settingsData);
   };
 
@@ -117,8 +132,26 @@ export default function SalesPage() {
               ) : filteredSales.map((sale) => (
                 <tr key={sale.id} className="hover:bg-white/[0.02] transition-colors group">
                   <td className="px-6 py-4 font-mono text-primary text-sm font-bold">{sale.os_number || 'S/N'}</td>
-                  <td className="px-6 py-4 font-medium">{sale.tecnico || 'N/A'}</td>
-                  <td className="px-6 py-4 text-sm text-white/60">{new Date(sale.criado_em).toLocaleDateString()}</td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-white">{sale.cliente_nome}</span>
+                      {(sale.status === 'PRONTA' || sale.status === 'ENTREGUE' || sale.status === 'CONCLUIDO') && sale.cliente_whatsapp && (
+                        <button 
+                          onClick={() => openWhatsApp(
+                            sale.cliente_whatsapp, 
+                            `Olá ${sale.cliente_nome}, aqui é da Ótica Lis! 👓 Seu óculos já está pronto e te esperando. Pode vir buscar quando quiser!`
+                          )}
+                          className="flex items-center gap-1.5 px-2 py-1 bg-green-500/10 text-green-500 rounded-lg hover:bg-green-500/20 transition-all border border-green-500/20 text-[10px] font-black uppercase tracking-widest"
+                          title="Avisar Cliente via WhatsApp"
+                        >
+                          <MessageSquare size={14} />
+                          Avisar Cliente
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-white/30 italic">Técnico: {sale.tecnico || 'N/A'}</p>
+                  </td>
+                  <td className="px-6 py-4 text-sm text-white/60">{formatDate(sale.criado_em)}</td>
                   <td className="px-6 py-4">
                     <StatusBadge status={sale.status || 'ABERTA'} />
                   </td>
