@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Package, ShieldCheck, Info, AlertCircle } from 'lucide-react';
+import { X, Package, ShieldCheck, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { storage } from '../lib/storage';
 
@@ -123,24 +123,24 @@ export default function ProductModal({ isOpen, onClose, product }: ProductModalP
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Input label="Nome do Produto" value={formData.nome} onChange={(v) => setFormData({...formData, nome: v})} placeholder="Ex: Armação Lis Premium Gold" />
-              <Input label="Marca / Fabricante" value={formData.marca} onChange={(v) => setFormData({...formData, marca: v})} placeholder="Ex: Lis Eyewear" />
+              <Input label="Nome do Produto" value={formData.nome} onChange={(v: string) => setFormData({...formData, nome: v})} placeholder="Ex: Armação Lis Premium Gold" />
+              <Input label="Marca / Fabricante" value={formData.marca} onChange={(v: string) => setFormData({...formData, marca: v})} placeholder="Ex: Lis Eyewear" />
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
               <Select 
                 label="Unidade" 
                 value={formData.unidade} 
-                onChange={(v) => setFormData({...formData, unidade: v})}
+                onChange={(v: string) => setFormData({...formData, unidade: v})}
                 options={[
                   { value: 'UN', label: 'Unidade (UN)' },
                   { value: 'PAR', label: 'Par (PAR)' },
                   { value: 'PC', label: 'Peça (PC)' },
                 ]}
               />
-              <Input label="Preço Custo (R$)" type="number" step="0.01" value={formData.preco_custo} onChange={(v) => setFormData({...formData, preco_custo: v})} placeholder="0.00" />
-              <Input label="Preço Venda (R$)" type="number" step="0.01" value={formData.preco_venda} onChange={(v) => setFormData({...formData, preco_venda: v})} placeholder="0.00" />
-              <Input label="Estoque Inicial" type="number" value={formData.estoque} onChange={(v) => setFormData({...formData, estoque: v})} placeholder="0" />
+              <Input label="Preço Custo (R$)" type="number" step="0.01" value={formData.preco_custo} onChange={(v: string) => setFormData({...formData, preco_custo: v})} placeholder="0.00" />
+              <Input label="Preço Venda (R$)" type="number" step="0.01" value={formData.preco_venda} onChange={(v: string) => setFormData({...formData, preco_venda: v})} placeholder="0.00" />
+              <Input label="Estoque Inicial" type="number" value={formData.estoque} onChange={(v: string) => setFormData({...formData, estoque: v})} placeholder="0" />
             </div>
           </section>
 
@@ -166,15 +166,15 @@ export default function ProductModal({ isOpen, onClose, product }: ProductModalP
                   className={`w-full bg-white/5 border ${formData.ncm.replace(/\D/g, '').length === 8 ? 'border-white/10' : 'border-red-500/30'} rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-primary/50 transition-colors text-white font-medium`}
                 />
               </div>
-              <Input label="CEST" value={formData.cest} onChange={(v) => setFormData({...formData, cest: v})} placeholder="Código CEST" />
-              <Input label="CFOP Padrão" value={formData.cfop_padrao} onChange={(v) => setFormData({...formData, cfop_padrao: v})} placeholder="Ex: 5102" />
+              <Input label="CEST" value={formData.cest} onChange={(v: string) => setFormData({...formData, cest: v})} placeholder="Código CEST" />
+              <Input label="CFOP Padrão" value={formData.cfop_padrao} onChange={(v: string) => setFormData({...formData, cfop_padrao: v})} placeholder="Ex: 5102" />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Select 
                 label="Origem da Mercadoria" 
                 value={formData.origem} 
-                onChange={(v) => setFormData({...formData, origem: v})}
+                onChange={(v: string) => setFormData({...formData, origem: v})}
                 options={[
                   { value: '0', label: '0 - Nacional' },
                   { value: '1', label: '1 - Estrangeira (Importação Direta)' },
@@ -184,7 +184,7 @@ export default function ProductModal({ isOpen, onClose, product }: ProductModalP
               <Select 
                 label="CST / CSOSN" 
                 value={formData.csosn} 
-                onChange={(v) => setFormData({...formData, csosn: v})}
+                onChange={(v: string) => setFormData({...formData, csosn: v})}
                 options={[
                   { value: '101', label: '101 - Tributada com crédito' },
                   { value: '102', label: '102 - Tributada sem crédito' },
@@ -195,9 +195,9 @@ export default function ProductModal({ isOpen, onClose, product }: ProductModalP
             </div>
 
             <div className="grid grid-cols-3 gap-6 bg-white/[0.02] p-6 rounded-2xl border border-white/5">
-              <Input label="ICMS (%)" type="number" step="0.01" value={formData.icms} onChange={(v) => setFormData({...formData, icms: v})} />
-              <Input label="PIS (%)" type="number" step="0.01" value={formData.pis} onChange={(v) => setFormData({...formData, pis: v})} />
-              <Input label="COFINS (%)" type="number" step="0.01" value={formData.cofins} onChange={(v) => setFormData({...formData, cofins: v})} />
+              <Input label="ICMS (%)" type="number" step="0.01" value={formData.icms} onChange={(v: string) => setFormData({...formData, icms: v})} />
+              <Input label="PIS (%)" type="number" step="0.01" value={formData.pis} onChange={(v: string) => setFormData({...formData, pis: v})} />
+              <Input label="COFINS (%)" type="number" step="0.01" value={formData.cofins} onChange={(v: string) => setFormData({...formData, cofins: v})} />
             </div>
           </section>
 

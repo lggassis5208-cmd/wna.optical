@@ -5,11 +5,9 @@ import {
   ArrowDownLeft, 
   Filter, 
   Search,
-  CheckCircle2,
   Clock,
   MoreVertical,
-  X,
-  Calendar
+  X
 } from 'lucide-react';
 import { storage } from '../lib/storage';
 import { toast } from 'sonner';
@@ -17,7 +15,6 @@ import { toast } from 'sonner';
 export default function FinanceiroPage() {
   const [tab, setTab] = useState<'pagar' | 'receber'>('receber');
   const [data, setData] = useState<{ pagar: any[], receber: any[] }>({ pagar: [], receber: [] });
-  const [loading, setLoading] = useState(true);
   const [modalAberto, setModalAberto] = useState(false);
   const [novaConta, setNovaConta] = useState({
     descricao: '',
@@ -27,10 +24,8 @@ export default function FinanceiroPage() {
   });
 
   const fetchFinanceiro = async () => {
-    setLoading(true);
     const result = await storage.getFinanceiro();
     setData(result);
-    setLoading(false);
   };
 
   useEffect(() => {

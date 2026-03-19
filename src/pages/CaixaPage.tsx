@@ -104,7 +104,7 @@ export default function CaixaPage() {
               />
               <FinancialMetric 
                 label="Entradas (Total)" 
-                value={Object.values(caixaAtivo.entradas).reduce((a: any, b: any) => a + b, 0)} 
+                value={Object.values(caixaAtivo.entradas).reduce((a: number, b: any) => a + Number(b), 0)} 
                 icon={<ArrowUpCircle size={20} />} 
                 color="text-green-500"
               />
