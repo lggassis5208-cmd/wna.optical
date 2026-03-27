@@ -203,17 +203,63 @@ export const storage = {
     const notas = JSON.parse(localStorage.getItem('lis_notas_fiscais') || '[]');
     const novaNota = { 
       ...nota, 
-      id: Math.random().toString(36).substr(2, 9), 
-      numero: (notas.length + 1).toString().padStart(6, '0'),
-      data_emissao: new Date().toISOString() 
+      id: nota.id || Math.random().toString(36).substr(2, 9), 
+      numero: nota.numero || (notas.length + 1).toString().padStart(6, '0'),
+      data_emissao: nota.data_emissao || new Date().toISOString(),
+      status: nota.status || 'PENDENTE'
     };
-    notas.push(novaNota);
+    
+    const index = notas.findIndex((n: any) => n.id === novaNota.id);
+    if (index !== -1) {
+      notas[index] = novaNota;
+    } else {
+      notas.push(novaNota);
+    }
+    
     localStorage.setItem('lis_notas_fiscais', JSON.stringify(notas));
     return novaNota;
   },
 
   async getNotasFiscais() {
-    return JSON.parse(localStorage.getItem('lis_notas_fiscais') || '[]');
+    const notas = JSON.parse(localStorage.getItem('lis_notas_fiscais') || '[]');
+    return notas.sort((a: any, b: any) => new Date(b.data_emissao).getTime() - new Date(a.data_emissao).getTime());
+  },
+
+  async cancelarNotaFiscal(notaId: string) {
+    const notas = await this.getNotasFiscais();
+    const index = notas.findIndex((n: any) => n.id === notaId);
+    if (index !== -1) {
+      notas[index].status = 'CANCELADA';
+      localStorage.setItem('lis_notas_fiscais', JSON.stringify(notas));
+      return notas[index];
+    }
+    return null;
+  },
+
+  async gerarNotaDeVenda(saleId: string) {
+    const [sales, clients] = await Promise.all([
+      this.getSales(),
+      this.getClients()
+    ]);
+    
+    const sale = sales.find((s: any) => s.id === saleId);
+    if (!sale) throw new Error('Venda não encontrada.');
+
+    const client = clients.find((c: any) => c.id === sale.cliente_id || c.cpf === sale.paciente_cpf);
+    const cliente_nome = client?.name || sale.paciente_nome || sale.tecnico || 'Consumidor Final';
+
+    const novaNota = {
+      cliente: cliente_nome,
+      cliente_doc: client?.documento || client?.cpf || sale.paciente_cpf || '',
+      valor_total: sale.valor_total || sale.total || 0,
+      itens: sale.items || [],
+      venda_id: sale.id,
+      status: 'EMITIDA', // Na prática seria disparado para SEFAZ, aqui simulamos sucesso imediato
+      natureza: 'Venda de Mercadoria',
+      cfop: '5102'
+    };
+
+    return await this.registrarNotaFiscal(novaNota);
   },
 
   async registrarVenda(sale: any) {
@@ -250,6 +296,37 @@ export const storage = {
     });
 
     return novaVenda;
+  },
+
+  async updateSaleStatus(saleId: string, newStatus: string) {
+    const sales = await this.getSales();
+    const index = sales.findIndex((s: any) => s.id === saleId);
+    
+    if (index !== -1) {
+      const oldStatus = sales[index].status;
+      sales[index].status = newStatus;
+      
+      // Lógica de Baixa Automática (Trigger Manual no Backend/Storage)
+      if ((newStatus === 'MONTAGEM' || newStatus === 'FINALIZADO') && oldStatus !== 'MONTAGEM' && oldStatus !== 'FINALIZADO') {
+        const products = await this.getProducts();
+        // Busca produto pelo tipo e tratamento da venda
+        const sale = sales[index];
+        const prodIndex = products.findIndex((p: any) => 
+          p.nome.toLowerCase().includes((sale.tipo_lente || '').toLowerCase()) && 
+          p.nome.toLowerCase().includes((sale.tratamento || '').toLowerCase())
+        );
+
+        if (prodIndex !== -1) {
+          products[prodIndex].estoque = Math.max(0, (Number(products[prodIndex].estoque) || 0) - 1);
+          localStorage.setItem('lis_produtos', JSON.stringify(products));
+          console.log(`Baixa de estoque realizada para: ${products[prodIndex].nome}`);
+        }
+      }
+
+      localStorage.setItem('lis_vendas', JSON.stringify(sales));
+      return sales[index];
+    }
+    return null;
   },
 
   async registrarNotaFiscal(nota: any) {
@@ -319,6 +396,20 @@ export const storage = {
     
     localStorage.setItem('lis_produtos', JSON.stringify(products));
     return newProduct;
+  },
+
+  async seedDemoProducts() {
+    const products = await this.getProducts();
+    if (products.length === 0) {
+      const demo = [
+        { id: 'p1', nome: 'Lente BVS Crizal Sapphire', categoria: 'Visão Simples', material: 'Resina 1.56', preco_venda: 450.00, preco_custo: 200.00, estoque: 12, stock_minimo: 5, unidade: 'Par' },
+        { id: 'p2', nome: 'Lente LP Video Filter Blue', categoria: 'Lente Pronta', material: 'Policarbonato', preco_venda: 280.00, preco_custo: 120.00, estoque: 4, stock_minimo: 10, unidade: 'Par' },
+        { id: 'p3', nome: 'Lente LP Easy Clean', categoria: 'Lente Pronta', material: 'Resina 1.50', preco_venda: 150.00, preco_custo: 60.00, estoque: 0, stock_minimo: 3, unidade: 'Par' }
+      ];
+      localStorage.setItem('lis_produtos', JSON.stringify(demo));
+      return demo;
+    }
+    return products;
   },
 
   // --- CONFIGURAÇÕES ---

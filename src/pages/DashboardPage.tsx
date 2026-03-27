@@ -25,7 +25,7 @@ import {
   Cell
 } from 'recharts';
 import { storage } from '../lib/storage';
-import { formatDate, formatDateTime } from '../lib/dateUtils';
+import { formatDate } from '../lib/dateUtils';
 import { useNavigate } from 'react-router-dom';
 import { openWhatsApp } from '../lib/whatsappUtils';
 
@@ -53,6 +53,11 @@ export default function DashboardPage() {
       ]);
 
       setSales(allSales);
+
+      // 0. Seed de Produtos de Exemplo se estiver vazio
+      if (allProducts.length === 0) {
+        await storage.seedDemoProducts();
+      }
 
       // 1. KPIs
       const hoje = new Date().toLocaleDateString();
@@ -310,41 +315,42 @@ export default function DashboardPage() {
             <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />
           </button>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="bg-white/[0.02] text-[10px] uppercase tracking-widest text-white/40 font-bold">
-                <th className="px-6 py-4">ID / O.S.</th>
-                <th className="px-6 py-4">Cliente / Técnico</th>
-                <th className="px-6 py-4">Data</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-right">Valor</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {sales.slice(-5).reverse().map((s: any) => (
-                <tr key={s.id} className="hover:bg-white/[0.02] transition-colors group">
-                  <td className="px-6 py-4 font-mono text-primary text-sm font-bold">{s.os_number || 'S/N'}</td>
-                  <td className="px-6 py-4">
-                    <p className="font-bold text-sm text-white">{s.tecnico || 'Cliente'}</p>
-                    <p className="text-[10px] text-white/30 italic">Unidade Matriz</p>
-                  </td>
-                  <td className="px-6 py-4 text-xs text-white/60">{formatDateTime(s.criado_em)}</td>
-                  <td className="px-6 py-4">
+        <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {sales.slice(-6).reverse().map((s: any) => {
+            const treatmentColors: Record<string, string> = {
+              'Crizal': 'border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.2)]',
+              'Video Filter': 'border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.2)]',
+              'Sapphire': 'border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.2)]',
+              'Easy': 'border-slate-400 shadow-[0_0_15px_rgba(148,163,184,0.2)]',
+            };
+            const borderColor = treatmentColors[s.tratamento] || 'border-white/10';
+
+            return (
+              <div key={s.id} className={`bg-white/[0.02] p-5 rounded-2xl border-2 ${borderColor} transition-all hover:scale-[1.02] flex flex-col justify-between group`}>
+                <div>
+                  <div className="flex justify-between items-start mb-3">
+                    <span className="font-mono text-[10px] font-black text-primary uppercase tracking-tighter">{s.os_number || 'S/N'}</span>
                     <StatusBadge status={s.status || 'ABERTA'} />
-                  </td>
-                  <td className="px-6 py-4 text-right font-bold text-white">
-                    R$ {Number(s.valor_total || 0).toFixed(2)}
-                  </td>
-                </tr>
-              ))}
-              {sales.length === 0 && (
-                <tr>
-                   <td colSpan={5} className="px-6 py-12 text-center text-white/10 italic text-sm">Nenhuma O.S. recente para exibir.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                  </div>
+                  <h4 className="font-bold text-white group-hover:text-primary transition-colors">{s.tecnico || 'Cliente Final'}</h4>
+                  <p className="text-[10px] text-white/40 uppercase font-black tracking-widest mt-1">
+                    {s.tipo_lente || 'LENTE'} {s.tratamento ? `+ ${s.tratamento}` : ''}
+                  </p>
+                </div>
+                
+                <div className="mt-6 flex justify-between items-end border-t border-white/5 pt-4">
+                  <div>
+                    <p className="text-[10px] text-white/20 uppercase font-bold">Valor OS</p>
+                    <p className="font-black text-white">R$ {Number(s.valor_total || 0).toFixed(2)}</p>
+                  </div>
+                  <p className="text-[9px] text-white/20 font-medium">{formatDate(s.criado_em)}</p>
+                </div>
+              </div>
+            );
+          })}
+          {sales.length === 0 && (
+             <div className="col-span-full py-12 text-center text-white/10 italic text-sm font-medium">Nenhuma O.S. recente para exibir.</div>
+          )}
         </div>
       </section>
     </div>

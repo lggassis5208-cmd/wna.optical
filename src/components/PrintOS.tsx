@@ -8,13 +8,11 @@ interface PrintOSProps {
 const PrintOS: React.FC<PrintOSProps> = ({ sale, settings }) => {
   if (!sale || !settings) return null;
 
-  const { empresa, sistema } = settings;
-
   return (
-    <div className="print-container hidden print:block bg-white text-black p-8 font-serif leading-tight">
+    <div className="print-container hidden print:block bg-white text-black p-10 font-sans leading-relaxed min-h-screen">
       <style>{`
         @media print {
-          body { background: white !important; }
+          body { background: white !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
           .print-container { 
             display: block !important;
             visibility: visible !important;
@@ -24,130 +22,118 @@ const PrintOS: React.FC<PrintOSProps> = ({ sale, settings }) => {
             width: 100%;
             height: auto;
             margin: 0;
-            padding: 2cm;
+            padding: 1.5cm;
+            background: white !important;
           }
-          #root > :not(.print-container),
-          .animate-in,
-          aside,
-          header,
-          button:not(.print-only) { 
-            display: none !important; 
-          }
+          #root > :not(.print-container) { display: none !important; }
         }
       `}</style>
       
-      {/* Header */}
-      <div className="border-b-2 border-black pb-6 mb-6 flex justify-between items-start">
-        <div className="flex items-center gap-6">
-          <img src="/otica.png" alt="Logo" className="w-32 h-auto object-contain" />
-          <div>
-            <h1 className="text-2xl font-black uppercase tracking-tighter">{empresa.nome_fantasia || 'Ótica Lis'}</h1>
-            <p className="text-xs font-bold">{empresa.razao_social}</p>
-            <p className="text-xs mt-1">CNPJ: {empresa.cnpj} | IE: {empresa.ie}</p>
-            <p className="text-xs">{empresa.endereco}</p>
-          </div>
-        </div>
-        <div className="text-right">
-          <p className="text-sm font-black">ORDEM DE SERVIÇO</p>
-          <p className="text-2xl font-black">#{(sale.id?.slice(-6) || '000000').toUpperCase()}</p>
-          <p className="text-xs mt-1">{new Date(sale.data || Date.now()).toLocaleDateString('pt-BR')} às {new Date(sale.data || Date.now()).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
-        </div>
-      </div>
-
-      {/* Client Data */}
-      <div className="mb-6">
-        <h3 className="text-xs font-black uppercase border-b border-black mb-2 bg-gray-100 px-1">Dados do Cliente</h3>
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <p><strong>Nome:</strong> {sale.cliente_nome}</p>
-          <p><strong>CPF:</strong> {sale.cliente_cpf}</p>
-        </div>
-      </div>
-
-      {/* Prescription / Receita */}
-      <div className="mb-6">
-        <h3 className="text-xs font-black uppercase border-b border-black mb-2 bg-gray-100 px-1">Dados da Receita</h3>
-        <table className="w-full border-collapse border border-black text-center text-sm">
-          <thead>
-            <tr className="bg-gray-50 uppercase text-[10px] font-black">
-              <th className="border border-black p-1">Olho</th>
-              <th className="border border-black p-1">Esférico</th>
-              <th className="border border-black p-1">Cilíndrico</th>
-              <th className="border border-black p-1">Eixo</th>
-              <th className="border border-black p-1">DNP</th>
-              <th className="border border-black p-1">Adição</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td className="border border-black p-2 font-black">LONGE OD</td>
-              <td className="border border-black p-2">{sale.od_esferico || '0.00'}</td>
-              <td className="border border-black p-2">{sale.od_cilindrico || '0.00'}</td>
-              <td className="border border-black p-2">{sale.od_eixo || '0'}°</td>
-              <td className="border border-black p-2">{sale.dnp_od || '--'} mm</td>
-              <td className="border border-black p-2" rowSpan={2}>{sale.adicao || '--'}</td>
-            </tr>
-            <tr>
-              <td className="border border-black p-2 font-black">LONGE OE</td>
-              <td className="border border-black p-2">{sale.oe_esferico || '0.00'}</td>
-              <td className="border border-black p-2">{sale.oe_cilindrico || '0.00'}</td>
-              <td className="border border-black p-2">{sale.oe_eixo || '0'}°</td>
-              <td className="border border-black p-2">{sale.dnp_oe || '--'} mm</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      {/* Frame & Lens */}
-      <div className="grid grid-cols-2 gap-8 mb-8">
-        <div>
-          <h3 className="text-xs font-black uppercase border-b border-black mb-2 bg-gray-100 px-1">Armação</h3>
-          <div className="text-sm space-y-1">
-            <p><strong>Marca/Modelo:</strong> {sale.produto_nome || '--'}</p>
-            <p><strong>Cor/Detalhes:</strong> {sale.observacoes || 'Nenhuma observação'}</p>
-          </div>
-        </div>
-        <div>
-          <h3 className="text-xs font-black uppercase border-b border-black mb-2 bg-gray-100 px-1">Lentes / Tratamentos</h3>
-          <div className="text-sm space-y-1">
-            <p><strong>Especificação:</strong> Lentes de Grau Personalizadas</p>
-            <p><strong>Tratamentos:</strong> {sale.status === 'Pronto' ? 'Conferido no Laboratório' : 'Pendente de Processamento'}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Totals */}
-      <div className="bg-gray-100 p-4 border border-black mb-8 flex justify-between items-center">
-        <div className="text-sm">
-          <p><strong>Forma de Pagamento:</strong> {sale.forma_pagamento}</p>
-          <p className="text-xs text-gray-500 mt-1 uppercase font-bold tracking-widest">Documento não fiscal para uso interno e laboratorial</p>
-        </div>
-        <div className="text-right">
-          <p className="text-xs font-black uppercase">Valor Total</p>
-          <p className="text-3xl font-black">R$ {Number(sale.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-        </div>
-      </div>
-
-      {/* Warranty & Footer */}
-      <div className="grid grid-cols-1 gap-8">
-        <div>
-          <p className="text-[10px] uppercase font-black tracking-widest text-gray-400 mb-1">Termos de Garantia</p>
-          <p className="text-xs italic leading-relaxed text-gray-600">
-            {sistema.termos_garantia}
+      {/* Header Ótica Lìs */}
+      <div className="border-b-4 border-black pb-8 mb-8 flex justify-between items-start">
+        <div className="space-y-1.5">
+          <h1 className="text-4xl font-black uppercase tracking-tighter text-black">Ótica Lìs</h1>
+          <p className="text-sm font-bold text-black/80">CNPJ: 39.156.577/0001-22</p>
+          <p className="text-xs text-black/60 leading-relaxed max-w-sm">
+            Avenida Anápolis Qd 03 Lt 01 - Nª 2134 - Vila Concórdia - Cep 74770-270
           </p>
         </div>
-        <div className="flex justify-between items-end mt-12">
-          <div className="text-center w-64 border-t border-black pt-2">
-            <p className="text-[10px] font-black uppercase">Responsável Ótica Lis</p>
-          </div>
-          <div className="text-center w-72 border-t border-black pt-2">
-            <p className="text-[10px] font-black uppercase">Assinatura do Cliente</p>
-            <p className="text-[8px] mt-1 italic">Autorizo a execução do serviço conforme prescrição acima.</p>
-          </div>
+        <div className="text-right space-y-1 border-2 border-black p-5 rounded-xl bg-[#FFD700] shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
+          <p className="text-[11px] font-black uppercase tracking-widest text-black/60">Ordem de Serviço</p>
+          <p className="text-3xl font-black text-black">#{(sale.id?.slice(-6) || '000000').toUpperCase()}</p>
+          <p className="text-[10px] font-bold text-black/40 italic uppercase">{new Date(sale.data || Date.now()).toLocaleDateString('pt-BR')}</p>
         </div>
       </div>
 
-      <div className="mt-8 text-[8px] text-center text-gray-400 border-t border-dashed border-gray-200 pt-4 grayscale opacity-50 no-print">
-        Ótica Lis ERP - Documento gerado eletronicamente em {new Date().toLocaleString('pt-BR')}
+      {/* Client Data Section */}
+      <div className="mb-8 p-4 bg-[#F2F2F2] rounded-xl border-l-8 border-[#FFD700]">
+        <h3 className="text-[10px] font-black uppercase tracking-widest text-black/40 mb-2">Dados do Cliente</h3>
+        <div className="grid grid-cols-2 gap-6 text-sm">
+          <p><strong className="text-black/60 uppercase text-[10px]">Nome Completo:</strong><br/><span className="font-bold text-base">{sale.cliente_nome}</span></p>
+          <p><strong className="text-black/60 uppercase text-[10px]">CPF / Documento:</strong><br/><span className="font-bold text-base">{sale.cliente_cpf || '---.---.--- --'}</span></p>
+        </div>
+      </div>
+
+      {/* Prescription Table */}
+      <div className="mb-8">
+        <h3 className="text-[10px] font-black uppercase tracking-widest text-black/40 mb-2">Dados Técnicos da Receita</h3>
+        <div className="border-2 border-black rounded-xl overflow-hidden shadow-[4px_4px_0px_0px_rgba(0,0,0,0.1)]">
+          <table className="w-full border-collapse text-center text-sm">
+            <thead>
+              <tr className="bg-[#FFD700] uppercase text-[10px] font-black text-black border-b-2 border-black">
+                <th className="p-2 border-r border-black/20">Olho</th>
+                <th className="p-2 border-r border-black/20">Esférico</th>
+                <th className="p-2 border-r border-black/20">Cilíndrico</th>
+                <th className="p-2 border-r border-black/20">Eixo</th>
+                <th className="p-2 border-r border-black/20">DNP</th>
+                <th className="p-2">Adição</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-black/10">
+              <tr className="bg-white">
+                <td className="p-3 font-black bg-[#F2F2F2] text-[10px]">LONGE OD</td>
+                <td className="p-3 border-x border-black/5">{sale.od_esferico || '0.00'}</td>
+                <td className="p-3 border-r border-black/5">{sale.od_cilindrico || '0.00'}</td>
+                <td className="p-3 border-r border-black/5">{sale.od_eixo || '0'}°</td>
+                <td className="p-3 border-r border-black/5">{sale.dnp_od || '--'} mm</td>
+                <td className="p-3 font-bold" rowSpan={2}>{sale.adicao || '--'}</td>
+              </tr>
+              <tr className="bg-[#F2F2F2]/30">
+                <td className="p-3 font-black bg-[#F2F2F2] text-[10px]">LONGE OE</td>
+                <td className="p-3 border-x border-black/5">{sale.oe_esferico || '0.00'}</td>
+                <td className="p-3 border-r border-black/5">{sale.oe_cilindrico || '0.00'}</td>
+                <td className="p-3 border-r border-black/5">{sale.oe_eixo || '0'}°</td>
+                <td className="p-3 border-r border-black/5">{sale.dnp_oe || '--'} mm</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Frame & Lens Detail Section */}
+      <div className="grid grid-cols-2 gap-8 mb-10">
+        <div className="space-y-4">
+          <div className="border-b-2 border-black pb-2">
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-black/40">Especificação da Armação</h3>
+            <p className="text-sm font-bold mt-1 text-black">{sale.produto_nome || '--'}</p>
+          </div>
+          <div className="bg-[#F2F2F2] p-3 rounded-lg text-xs italic text-black/60 min-h-[40px]">
+            {sale.observacoes || 'Nenhuma observação técnica adicional registrada.'}
+          </div>
+        </div>
+        <div className="space-y-4">
+          <div className="border-b-2 border-black pb-2">
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-black/40">Status do Laboratório</h3>
+            <p className="text-sm font-bold mt-1 text-black uppercase">{sale.status || 'EM PROCESSAMENTO'}</p>
+          </div>
+          <p className="text-xs font-medium text-black/60">O.S. validada conforme especificações técnicas Ótica Lìs.</p>
+        </div>
+      </div>
+
+      {/* Financial Highlight */}
+      <div className="bg-[#FFD700] p-8 border-4 border-black mb-12 flex justify-between items-center shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+        <div className="space-y-1">
+          <p className="text-[10px] font-black uppercase tracking-widest text-black/60">Forma de Pagamento</p>
+          <p className="text-xl font-bold text-black uppercase">{sale.forma_pagamento || 'A DEFINIR'}</p>
+        </div>
+        <div className="text-right">
+          <p className="text-[10px] font-black uppercase tracking-widest text-black/60">Total Líquido a Pagar</p>
+          <p className="text-5xl font-black text-black leading-none">R$ {Number(sale.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+        </div>
+      </div>
+
+      {/* Footer & Signature */}
+      <div className="space-y-12">
+        <div className="text-center w-full max-w-md mx-auto border-t-2 border-black pt-2">
+          <p className="text-[10px] font-black uppercase tracking-widest text-black/30">Assinatura de Conformidade do Cliente</p>
+          <p className="text-[8px] mt-1 italic text-black/20">Autorizo a Ótica Lìs a executar o serviço conforme parâmetros técnicos acima.</p>
+        </div>
+        
+        <div className="flex justify-between items-center text-[8px] text-black/20 uppercase font-bold tracking-[0.2em]">
+           <span>Ótica Lìs ERP</span>
+           <span>Página 1 / 1</span>
+           <span>Gerado em {new Date().toLocaleDateString('pt-BR')}</span>
+        </div>
       </div>
     </div>
   );

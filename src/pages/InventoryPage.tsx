@@ -121,49 +121,59 @@ export default function InventoryPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {filteredProducts.map((p) => (
-                <tr key={p.id} className="hover:bg-white/[0.02] transition-colors group">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
-                        <Package size={20} />
+              {filteredProducts.map((p) => {
+                const isZero = Number(p.estoque || 0) === 0;
+                const isLow = Number(p.estoque || 0) < Number(p.stock_minimo || 5);
+                const rowClass = isZero ? 'bg-red-500/10' : (isLow ? 'bg-yellow-500/5' : '');
+
+                return (
+                  <tr key={p.id} className={`${rowClass} hover:bg-white/[0.04] transition-colors group border-b border-white/5`}>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center text-primary group-hover:scale-110 transition-transform font-black">
+                          {p.nome.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="font-bold text-sm text-white group-hover:text-primary transition-colors">{p.nome}</p>
+                          <p className="text-[10px] text-white/40 uppercase font-black tracking-widest">{p.categoria || 'Geral'} • {p.material || 'N/A'}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-bold text-sm">{p.nome}</p>
-                        <p className="text-xs text-white/40">{p.marca}</p>
+                    </td>
+                    <td className="px-6 py-4 text-sm font-mono text-white/60">
+                      <div className="flex items-center gap-1">
+                         <Barcode size={14} className="text-white/20" />
+                         {p.ncm || 'EXT-001'}
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-sm font-mono text-white/60">
-                    <div className="flex items-center gap-1">
-                       <Barcode size={14} className="text-white/20" />
-                       {p.ncm}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="px-2 py-1 rounded-md bg-white/5 text-[10px] font-bold text-white/60">
-                      {p.unidade}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <p className="font-bold text-sm text-primary">R$ {Number(p.preco_venda).toFixed(2)}</p>
-                    <p className="text-[10px] text-white/20 italic">Custo: R$ {Number(p.preco_custo).toFixed(2)}</p>
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <span className={`
-                      font-bold px-3 py-1 rounded-full text-xs
-                      ${Number(p.estoque) < 5 ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-green-500/10 text-green-400 border border-green-500/20'}
-                    `}>
-                      {p.estoque} {p.unidade.toLowerCase()}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <button onClick={() => handleEdit(p)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
-                      <MoreVertical size={18} className="text-white/40" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="px-2 py-1 rounded-md bg-white/5 text-[10px] font-black uppercase text-white/40">
+                        {p.unidade || 'Par'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <p className="font-black text-sm text-white">R$ {Number(p.preco_venda || 0).toFixed(2)}</p>
+                      <p className="text-[10px] text-white/20 font-bold uppercase tracking-tighter">Custo: R$ {Number(p.preco_custo || 0).toFixed(2)}</p>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <span className={`
+                        font-black px-4 py-1.5 rounded-xl text-xs uppercase tracking-widest border transition-all
+                        ${isZero 
+                          ? 'bg-red-500 text-white border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.3)]' 
+                          : (isLow 
+                              ? 'bg-yellow-500/20 text-yellow-500 border-yellow-500/30' 
+                              : 'bg-green-500/10 text-green-400 border-green-500/20')}
+                      `}>
+                        {p.estoque} {p.unidade?.toLowerCase() || 'par'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <button onClick={() => handleEdit(p)} className="p-2.5 hover:bg-white/10 rounded-xl transition-all cursor-pointer text-white/20 hover:text-white">
+                        <MoreVertical size={18} />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
               {filteredProducts.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-white/20 italic text-sm">

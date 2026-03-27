@@ -46,3 +46,24 @@ CREATE TABLE sale_items (
     FOREIGN KEY (sale_id) REFERENCES sales(id),
     FOREIGN KEY (product_id) REFERENCES products(id)
 );
+
+-- NOVAS TABELAS SÓ LENTES
+CREATE TABLE IF NOT EXISTS products_sl (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nome VARCHAR(255) NOT NULL,
+    categoria VARCHAR(100),
+    material VARCHAR(100),
+    preco_custo DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    preco_venda DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    stock_minimo INT DEFAULT 5,
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS stock_levels (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    product_id INT NOT NULL,
+    quantidade INT DEFAULT 0,
+    localizacao VARCHAR(100),
+    atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (product_id) REFERENCES products_sl(id)
+);

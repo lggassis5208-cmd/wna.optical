@@ -12,6 +12,7 @@ import {
   Printer,
   MessageSquare
 } from 'lucide-react';
+import { toast } from 'sonner';
 import SaleModal from '../components/SaleModal';
 import PrintOS from '../components/PrintOS';
 import { storage } from '../lib/storage';
@@ -158,6 +159,28 @@ export default function SalesPage() {
                   <td className="px-6 py-4 font-bold text-white">R$ {parseFloat(sale.valor_total || 0).toFixed(2)}</td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {(sale.status === 'PRONTA' || sale.status === 'ENTREGUE' || sale.status === 'CONCLUIDO' || sale.status === 'FINALIZADO') && (
+                        <button 
+                          onClick={async () => {
+                            try {
+                              await storage.gerarNotaDeVenda(sale.id);
+                              toast.success('Nota Fiscal Gerada!', {
+                                description: `A NF para o cliente ${sale.cliente_nome} já está disponível no módulo Fiscal.`,
+                                action: {
+                                  label: 'Ver Notas',
+                                  onClick: () => window.location.href = '/fiscal'
+                                }
+                              });
+                            } catch (e: any) {
+                              toast.error('Erro ao gerar NF', { description: e.message });
+                            }
+                          }}
+                          className="p-2 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg transition-all border border-primary/20"
+                          title="Gerar Nota Fiscal"
+                        >
+                          <FileText size={18} />
+                        </button>
+                      )}
                       <button 
                         onClick={() => handlePrint(sale)}
                         className="p-2 hover:bg-white/5 rounded-lg text-white/30 hover:text-primary transition-colors cursor-pointer"
@@ -165,7 +188,6 @@ export default function SalesPage() {
                       >
                         <Printer size={18} />
                       </button>
-                      <button className="p-2 hover:bg-white/5 rounded-lg text-white/30 hover:text-white transition-colors cursor-pointer"><FileText size={18} /></button>
                       <button className="p-2 hover:bg-white/5 rounded-lg text-white/30 hover:text-white transition-colors cursor-pointer"><MoreVertical size={18} /></button>
                     </div>
                   </td>

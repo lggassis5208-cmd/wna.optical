@@ -48,10 +48,12 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
     oe_eixo: '',
     oe_dnp: '',
     oe_adicao: '',
+    tipo_lente: '', // LP ou BVS
+    tratamento: '', // Blue, Crizal, etc
     is_birthday_discount: false,
-    valor_base: '1000.00',
+    valor_base: '0.00',
     desconto: '0.00',
-    valor_total: '1000.00',
+    valor_total: '0.00',
     forma_pagamento: 'Cartão de Crédito'
   };
 
@@ -69,6 +71,24 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
     
     setFormData(prev => ({ ...prev, valor_total: total.toFixed(2) }));
   }, [formData.valor_base, formData.desconto, formData.is_birthday_discount]);
+
+  // Busca automática de produto ao mudar lente/tratamento
+  useEffect(() => {
+    const searchProduct = async () => {
+      if (formData.tipo_lente && formData.tratamento) {
+        const products = await storage.getProducts();
+        const found = products.find((p: any) => 
+          p.nome.toLowerCase().includes(formData.tipo_lente.toLowerCase()) && 
+          p.nome.toLowerCase().includes(formData.tratamento.toLowerCase())
+        );
+        if (found) {
+          setFormData(prev => ({ ...prev, valor_base: found.preco_venda.toString() }));
+          toast.info(`Produto encontrado: ${found.nome}`);
+        }
+      }
+    };
+    searchProduct();
+  }, [formData.tipo_lente, formData.tratamento]);
 
   const checkCaixa = async () => {
     setCheckingCaixa(true);
@@ -217,10 +237,42 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
                   />
                 </div>
                 <div className="space-y-4">
-                  <h4 className="text-xs font-bold text-white/20 uppercase tracking-widest border-b border-white/5 pb-2">Observações</h4>
+                  <h4 className="text-xs font-bold text-white/20 uppercase tracking-widest border-b border-white/5 pb-2">Especificações da Lente</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                       <label className="text-[10px] font-bold text-white/30 uppercase ml-1">Tipo de Lente</label>
+                       <select 
+                         className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-4 text-sm text-white focus:border-primary/50"
+                         value={formData.tipo_lente}
+                         onChange={(e) => setFormData({...formData, tipo_lente: e.target.value})}
+                       >
+                         <option value="">Selecione...</option>
+                         <option value="LP">LP (Lente Pronta)</option>
+                         <option value="BVS">BVS (Visão Simples)</option>
+                         <option value="MULTIFOCAL">Multifocal</option>
+                       </select>
+                    </div>
+                    <div className="space-y-2">
+                       <label className="text-[10px] font-bold text-white/30 uppercase ml-1">Tratamento</label>
+                       <select 
+                         className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-4 text-sm text-white focus:border-primary/50"
+                         value={formData.tratamento}
+                         onChange={(e) => setFormData({...formData, tratamento: e.target.value})}
+                       >
+                         <option value="">Selecione...</option>
+                         <option value="Crizal">Crizal (Azul)</option>
+                         <option value="Video Filter">Video Filter (Roxo)</option>
+                         <option value="Sapphire">Sapphire (Verde)</option>
+                         <option value="Easy">Easy (Prata)</option>
+                       </select>
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <h4 className="text-xs font-bold text-white/20 uppercase tracking-widest border-b border-white/5 pb-2">Observações Técnicas</h4>
                   <textarea 
-                    className="w-full h-[100px] bg-white/5 border border-white/10 rounded-xl p-4 text-sm focus:outline-none focus:border-primary/50 transition-colors resize-none"
-                    placeholder="Detalhes adicionais..."
+                    className="w-full h-[80px] bg-white/5 border border-white/10 rounded-xl p-4 text-sm focus:outline-none focus:border-primary/50 transition-colors resize-none"
+                    placeholder="Detalhes adicionais para o laboratório..."
                   />
                 </div>
               </section>

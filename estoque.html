@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Estoque | SÓ LENTES</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #FFBF00;
+            --surface: #1A1A1A;
+            --background: #0F0F0F;
+            --border: rgba(255, 255, 255, 0.05);
+            --text-main: #FFFFFF;
+            --text-dim: rgba(255, 255, 255, 0.4);
+            --low-stock: rgba(255, 191, 0, 0.1);
+            --zero-stock: rgba(239, 68, 68, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        body {
+            background-color: var(--background);
+            color: var(--text-main);
+            min-height: 100-screen;
+            padding: 40px;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        header {
+            margin-bottom: 40px;
+            display: flex;
+            justify-content: space-between;
+            items: end;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 900;
+            letter-spacing: -1px;
+        }
+
+        .highlight {
+            color: var(--primary);
+            font-style: italic;
+        }
+
+        p.subtitle {
+            color: var(--text-dim);
+            font-size: 0.9rem;
+            margin-top: 4px;
+        }
+
+        .table-container {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            overflow: hidden;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th {
+            background: rgba(255, 255, 255, 0.02);
+            padding: 20px 24px;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-weight: 900;
+            color: var(--text-dim);
+            border-bottom: 1px solid var(--border);
+        }
+
+        td {
+            padding: 20px 24px;
+            font-size: 0.9rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        .stock-tag {
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            font-weight: 900;
+            display: inline-block;
+        }
+
+        .row-low {
+            background-color: var(--low-stock);
+        }
+
+        .row-zero {
+            background-color: var(--zero-stock);
+        }
+
+        .price {
+            font-weight: 900;
+            color: var(--primary);
+        }
+
+        .material-tag {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            color: var(--text-dim);
+        }
+
+        /* Status colors */
+        .status-low { color: #FFBF00; }
+        .status-zero { color: #EF4444; }
+        .status-ok { color: #10B981; }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <div>
+                <h1>Gestão de <span class="highlight">Estoque</span></h1>
+                <p class="subtitle">Módulo de Produtos e Inventário SÓ LENTES</p>
+            </div>
+        </header>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Produto</th>
+                        <th>Categoria</th>
+                        <th>Material</th>
+                        <th>Venda (R$)</th>
+                        <th>Quantidade</th>
+                        <th>Localização</th>
+                    </tr>
+                </thead>
+                <tbody id="inventory-body">
+                    <!-- Data will be populated here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const products = [
+            { id: 1, nome: 'Lente BVS Crizal Sapphire', categoria: 'Visão Simples', material: 'Resina 1.56', preco_venda: 450.00, stock_minimo: 5, quantidade: 12, localizacao: 'GAVETA A1' },
+            { id: 2, nome: 'Lente LP Video Filter Blue', categoria: 'Lente Pronta', material: 'Policarbonato', preco_venda: 280.00, stock_minimo: 10, quantidade: 4, localizacao: 'GAVETA B2' },
+            { id: 3, nome: 'Lente BVS Easy Clean', categoria: 'Visão Simples', material: 'Resina 1.50', preco_venda: 150.00, stock_minimo: 3, quantidade: 0, localizacao: 'ESTOQUE CENTRAL' }
+        ];
+
+        const tbody = document.getElementById('inventory-body');
+
+        products.forEach(p => {
+            const tr = document.createElement('tr');
+            
+            if (p.quantidade === 0) {
+                tr.className = 'row-zero';
+            } else if (p.quantidade < p.stock_minimo) {
+                tr.className = 'row-low';
+            }
+
+            tr.innerHTML = `
+                <td>
+                    <div style="font-weight: 600;">${p.nome}</div>
+                </td>
+                <td><span style="opacity: 0.6 text-transform: uppercase; font-size: 0.7rem; font-weight: 600;">${p.categoria}</span></td>
+                <td><span class="material-tag">${p.material}</span></td>
+                <td class="price">R$ ${p.preco_venda.toFixed(2)}</td>
+                <td>
+                    <span class="stock-tag ${p.quantidade === 0 ? 'status-zero' : (p.quantidade < p.stock_minimo ? 'status-low' : 'status-ok')}">
+                        ${p.quantidade} unidades
+                    </span>
+                </td>
+                <td><span style="opacity: 0.4; font-size: 0.8rem;">${p.localizacao}</span></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    </script>
+</body>
+</html>
