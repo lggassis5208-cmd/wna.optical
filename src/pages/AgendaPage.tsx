@@ -7,7 +7,7 @@ import {
   X, 
   Loader2,
   RefreshCw,
-  BellRing
+  MessageSquare
 } from 'lucide-react';
 import { storage } from '../lib/storage';
 import { openWhatsApp } from '../lib/whatsappUtils';
@@ -133,14 +133,26 @@ export default function AgendaPage() {
                        <StatusBadge status={exame.status} />
                        {isWithin12h(exame.data, exame.horario) && exame.status === 'AGENDADO' && (
                           <button 
-                            onClick={() => openWhatsApp(
-                              exame.paciente_whatsapp || '', 
-                              `Olá ${exame.paciente_nome}, aqui é da Ótica Lìs! 👓 Passando para lembrar do seu exame agendado para daqui a pouco, às ${exame.horario}. Te esperamos!`
-                            )}
-                            className="p-1.5 bg-primary/10 text-primary rounded-lg border border-primary/20 animate-pulse hover:scale-110 transition-all"
-                            title="Enviar Lembrete 12h"
+                            onClick={() => {
+                              if (!exame.paciente_whatsapp) {
+                                toast.error('Telefone não cadastrado.');
+                                return;
+                              }
+                              openWhatsApp(
+                                exame.paciente_whatsapp, 
+                                `Olá ${exame.paciente_nome}, confirmamos seu exame na Ótica Lìs para amanhã às ${exame.horario}? Vila Concórdia aguarda você!`
+                              )
+                            }}
+                            disabled={!exame.paciente_whatsapp}
+                            title={!exame.paciente_whatsapp ? 'Cadastre o Zap primeiro' : 'Enviar Lembrete 12h'}
+                            className={`flex items-center gap-1.5 px-2 py-1 rounded-lg transition-all border text-[10px] font-black uppercase tracking-widest ${
+                              !exame.paciente_whatsapp 
+                                ? 'bg-white/5 text-white/20 border-white/5 cursor-not-allowed' 
+                                : 'bg-green-500/10 text-green-500 border-green-500/20 hover:bg-green-500/20'
+                            }`}
                           >
-                             <BellRing size={14} />
+                             <MessageSquare size={14} />
+                             {!exame.paciente_whatsapp ? 'Sem Zap' : 'Avisar Cliente'}
                           </button>
                        )}
                     </div>

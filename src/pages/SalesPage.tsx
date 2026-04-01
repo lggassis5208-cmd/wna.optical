@@ -136,17 +136,28 @@ export default function SalesPage() {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-white">{sale.cliente_nome}</span>
-                      {(sale.status === 'PRONTA' || sale.status === 'ENTREGUE' || sale.status === 'CONCLUIDO') && sale.cliente_whatsapp && (
+                      {(sale.status === 'PRONTA' || sale.status === 'ENTREGUE' || sale.status === 'CONCLUIDO') && (
                         <button 
-                          onClick={() => openWhatsApp(
-                            sale.cliente_whatsapp, 
-                            `Olá ${sale.cliente_nome}, aqui é da Ótica Lis! 👓 Seu óculos já está pronto e te esperando. Pode vir buscar quando quiser!`
-                          )}
-                          className="flex items-center gap-1.5 px-2 py-1 bg-green-500/10 text-green-500 rounded-lg hover:bg-green-500/20 transition-all border border-green-500/20 text-[10px] font-black uppercase tracking-widest"
-                          title="Avisar Cliente via WhatsApp"
+                          onClick={() => {
+                            if (!sale.cliente_whatsapp) {
+                              toast.error('Telefone não encontrado.');
+                              return;
+                            }
+                            openWhatsApp(
+                              sale.cliente_whatsapp, 
+                              `Olá ${sale.cliente_nome}! Boas notícias: seu óculos já está pronto na Ótica Lìs. Pode vir buscar! 👓`
+                            )
+                          }}
+                          disabled={!sale.cliente_whatsapp}
+                          title={!sale.cliente_whatsapp ? 'Cadastre o Zap primeiro' : 'Avisar Cliente via WhatsApp'}
+                          className={`flex items-center gap-1.5 px-2 py-1 rounded-lg transition-all border text-[10px] font-black uppercase tracking-widest ${
+                            !sale.cliente_whatsapp 
+                              ? 'bg-white/5 text-white/20 border-white/5 cursor-not-allowed' 
+                              : 'bg-green-500/10 text-green-500 border-green-500/20 hover:bg-green-500/20'
+                          }`}
                         >
                           <MessageSquare size={14} />
-                          Avisar Cliente
+                          {!sale.cliente_whatsapp ? 'Sem Zap' : 'Avisar Cliente'}
                         </button>
                       )}
                     </div>
@@ -167,12 +178,12 @@ export default function SalesPage() {
                               toast.success('Venda Baixada!', {
                                 description: 'Status atualizado e financeiro registrado.'
                               });
-                              if (sale.cliente_whatsapp) {
-                                openWhatsApp(
-                                  sale.cliente_whatsapp, 
-                                  `Olá ${sale.cliente_nome}, aqui é da Ótica Lìs! 👓 Seu óculos já está pronto e ficou maravilhoso! Pode passar aqui para buscar. ✅`
-                                );
-                              }
+                                if (sale.cliente_whatsapp) {
+                                  openWhatsApp(
+                                    sale.cliente_whatsapp, 
+                                    `Olá ${sale.cliente_nome}! Boas notícias: seu óculos já está pronto na Ótica Lìs. Pode vir buscar! 👓`
+                                  );
+                                }
                               fetchSales();
                             } catch (e: any) {
                               toast.error('Erro ao dar baixa', { description: e.message });

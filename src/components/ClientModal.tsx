@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { storage } from '../lib/storage';
+import { formatPhoneForWhatsApp } from '../lib/whatsappUtils';
 
 interface ClientModalProps {
   isOpen: boolean;
@@ -60,15 +61,29 @@ export default function ClientModal({ isOpen, onClose }: ClientModalProps) {
     }
   }, [cep]);
 
+  const maskPhone = (value: string) => {
+    const cleaned = value.replace(/\D/g, '');
+    if (cleaned.length <= 10) {
+      return cleaned.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3').substring(0, 14);
+    }
+    return cleaned.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3').substring(0, 15);
+  };
+
   const handleSave = async () => {
-    if (!formData.name || !formData.cpf) {
-      toast.error('Preencha nome e CPF');
+    if (!formData.name || !formData.whatsapp) {
+      toast.error('Preencha Nome e WhatsApp');
       return;
     }
 
     setLoading(true);
     try {
-      await storage.saveClient(formData);
+      // Garantir prefixo 55 e apenas números ao salvar
+      const cleanData = {
+        ...formData,
+        whatsapp: formatPhoneForWhatsApp(formData.whatsapp)
+      };
+      
+      await storage.saveClient(cleanData);
       toast.success('Cliente cadastrado com sucesso!');
       onClose();
     } catch (error) {
@@ -124,7 +139,7 @@ export default function ClientModal({ isOpen, onClose }: ClientModalProps) {
               <h4 className="text-xs font-bold text-white/20 uppercase tracking-widest border-b border-white/5 pb-2">Informações Básicas</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <InputGroup 
-                  label="Nome Completo" 
+                  label="Nome Completo (Obrigatório)" 
                   icon={<User size={16} />} 
                   placeholder="Ex: João Silva" 
                   value={formData.name}
@@ -138,11 +153,11 @@ export default function ClientModal({ isOpen, onClose }: ClientModalProps) {
                   onChange={(e) => setFormData({...formData, cpf: e.target.value})}
                 />
                 <InputGroup 
-                  label="WhatsApp" 
+                  label="WhatsApp (Obrigatório)" 
                   icon={<Phone size={16} />} 
                   placeholder="(11) 99999-9999" 
                   value={formData.whatsapp}
-                  onChange={(e) => setFormData({...formData, whatsapp: e.target.value})}
+                  onChange={(e) => setFormData({...formData, whatsapp: maskPhone(e.target.value)})}
                 />
                 <div className="space-y-2">
                   <label className="text-xs font-medium text-white/40 ml-1">Data de Nascimento</label>

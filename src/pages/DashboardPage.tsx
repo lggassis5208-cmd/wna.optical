@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import { 
   TrendingUp, 
   Wallet, 
@@ -249,14 +250,26 @@ export default function DashboardPage() {
                     <p className="text-xs text-white/40">Fez {new Date().getFullYear() - new Date(c.data_nascimento).getFullYear()} anos hoje!</p>
                   </div>
                   <button 
-                    onClick={() => openWhatsApp(
-                      c.whatsapp,
-                      `Olá, ${c.name}! Feliz aniversário de toda a equipe da Ótica Lis! 🥳🎂 Como presente, você ganhou 10% de desconto na sua próxima compra ou serviço conosco. Esperamos você!`
-                    )}
-                    className="flex items-center gap-2 bg-primary text-black px-4 py-2 rounded-xl text-xs font-black hover:scale-105 transition-transform"
+                    onClick={() => {
+                      if (!c.whatsapp) {
+                        toast.error('Número de Telefone não encontrado.');
+                        return;
+                      }
+                      openWhatsApp(
+                        c.whatsapp,
+                        `Parabéns pelo seu Aniversário! A Ótica Lìs gostaria de te presentear com um desconto especial, passe em nossa Ótica e confira agora!`
+                      );
+                    }}
+                    disabled={!c.whatsapp}
+                    title={!c.whatsapp ? 'Cadastre o Zap primeiro' : 'Enviar Presente'}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
+                      !c.whatsapp 
+                        ? 'bg-white/10 text-white/20 cursor-not-allowed' 
+                        : 'bg-primary text-black hover:scale-105'
+                    }`}
                   >
                     <MessageSquare size={14} />
-                    Enviar Desconto
+                    {!c.whatsapp ? 'Cadastre o Zap primeiro' : 'Enviar Desconto'}
                   </button>
                 </div>
               ))}

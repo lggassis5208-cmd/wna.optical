@@ -32,20 +32,47 @@ import LoginPage from './pages/LoginPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import { notificationService } from './lib/notificationService';
 import type { AppNotification } from './lib/notificationService';
+import { openWhatsApp } from './lib/whatsappUtils';
+import { toast } from 'sonner';
+import { 
+  MessageCircle,
+  CheckCircle,
+  Gift
+} from 'lucide-react';
 
 function NotificationBell() {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [isOpen, setIsOpen] = useState(false);
 
+  const fetchNotifications = async () => {
+    const active = await notificationService.getActiveNotifications();
+    setNotifications(active);
+  };
+
   useEffect(() => {
-    const fetchNotifications = async () => {
-      const active = await notificationService.getActiveNotifications();
-      setNotifications(active);
-    };
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 60000); // Check every minute
+    const interval = setInterval(fetchNotifications, 30000); // Check every 30s
     return () => clearInterval(interval);
   }, []);
+
+  const handleSendWhatsApp = (n: AppNotification) => {
+    if (!n.phone) {
+      toast.error('Número de Telefone não encontrado.', {
+        description: 'Cadastre o Zap primeiro nas configurações do cliente.'
+      });
+      return;
+    }
+
+    if (n.whatsappMessage) {
+      openWhatsApp(n.phone, n.whatsappMessage);
+      notificationService.markAsRead(n.id);
+      // Refresh local list immediately
+      setNotifications(prev => prev.filter(item => item.id !== n.id));
+      toast.success('WhatsApp aberto!', {
+        description: 'A notificação foi marcada como lida.'
+      });
+    }
+  };
 
   const unreadCount = notifications.length;
 
@@ -74,14 +101,33 @@ function NotificationBell() {
               </div>
             ) : (
               notifications.map(n => (
-                <div key={n.id} className="p-4 border-b border-white/5 hover:bg-white/[0.02] transition-colors cursor-pointer group">
+                <div key={n.id} className="p-4 border-b border-white/5 hover:bg-white/[0.02] transition-colors group">
                   <div className="flex gap-3">
-                    <div className={`p-2 rounded-lg h-fit ${n.type === 'EXAM' ? 'bg-blue-500/10 text-blue-500' : 'bg-yellow-500/10 text-yellow-500'}`}>
-                      {n.type === 'EXAM' ? <Calendar size={14} /> : <Package size={14} />}
+                    <div className={`p-2 rounded-lg h-fit ${n.type === 'EXAM' ? 'bg-blue-500/10 text-blue-500' : n.type === 'READY' ? 'bg-green-500/10 text-green-500' : n.type === 'BIRTHDAY' ? 'bg-primary/10 text-primary' : 'bg-yellow-500/10 text-yellow-500'}`}>
+                      {n.type === 'EXAM' ? <Calendar size={14} /> : n.type === 'READY' ? <CheckCircle size={14} /> : n.type === 'BIRTHDAY' ? <Gift size={14} /> : <Package size={14} />}
                     </div>
-                    <div>
+                    <div className="flex-1">
                       <p className="text-xs font-bold text-white group-hover:text-primary transition-colors">{n.title}</p>
                       <p className="text-[11px] text-white/40 leading-relaxed mt-0.5">{n.message}</p>
+                      
+                      {(n.type === 'EXAM' || n.type === 'READY' || n.type === 'BIRTHDAY') && (
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSendWhatsApp(n);
+                          }}
+                          disabled={!n.phone}
+                          title={!n.phone ? 'Cadastre o Zap primeiro' : 'Enviar WhatsApp Agora'}
+                          className={`w-full mt-3 text-[10px] font-black py-2 rounded-lg transition-all flex items-center justify-center gap-2 uppercase tracking-wider shadow-lg ${
+                            !n.phone 
+                              ? 'bg-white/10 text-white/20 cursor-not-allowed border border-white/5' 
+                              : 'bg-green-600 hover:bg-green-500 text-white shadow-green-500/10'
+                          }`}
+                        >
+                          <MessageCircle size={12} />
+                          {!n.phone ? 'Cadastre o Zap primeiro' : 'Enviar WhatsApp Agora'}
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
