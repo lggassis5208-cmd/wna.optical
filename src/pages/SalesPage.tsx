@@ -4,7 +4,7 @@ import {
   Search, 
   Filter, 
   Clock, 
-  CheckCircle2, 
+  CheckCircle, 
   Truck, 
   AlertCircle,
   MoreVertical,
@@ -83,7 +83,7 @@ export default function SalesPage() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <StatusCard title="Abertas" count={sales.filter(s => s.status === 'ABERTA' || !s.status).length} icon={<Clock className="text-yellow-500" size={20} />} color="border-yellow-500/20" />
         <StatusCard title="Laboratório" count={sales.filter(s => s.status === 'LABORATORIO').length} icon={<AlertCircle className="text-blue-500" size={20} />} color="border-blue-500/20" />
-        <StatusCard title="Prontas" count={sales.filter(s => s.status === 'PRONTA').length} icon={<CheckCircle2 className="text-green-500" size={20} />} color="border-green-500/20" />
+        <StatusCard title="Prontas" count={sales.filter(s => s.status === 'PRONTA').length} icon={<CheckCircle className="text-green-500" size={20} />} color="border-green-500/20" />
         <StatusCard title="Entregues" count={sales.filter(s => s.status === 'ENTREGUE').length} icon={<Truck className="text-white/40" size={20} />} color="border-white/5" />
       </div>
 
@@ -159,6 +159,31 @@ export default function SalesPage() {
                   <td className="px-6 py-4 font-bold text-white">R$ {parseFloat(sale.valor_total || 0).toFixed(2)}</td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {sale.status !== 'PRONTA' && sale.status !== 'ENTREGUE' && sale.status !== 'CONCLUIDO' && (
+                        <button 
+                          onClick={async () => {
+                            try {
+                              await storage.darBaixaVenda(sale.id);
+                              toast.success('Venda Baixada!', {
+                                description: 'Status atualizado e financeiro registrado.'
+                              });
+                              if (sale.cliente_whatsapp) {
+                                openWhatsApp(
+                                  sale.cliente_whatsapp, 
+                                  `Olá ${sale.cliente_nome}, aqui é da Ótica Lìs! 👓 Seu óculos já está pronto e ficou maravilhoso! Pode passar aqui para buscar. ✅`
+                                );
+                              }
+                              fetchSales();
+                            } catch (e: any) {
+                              toast.error('Erro ao dar baixa', { description: e.message });
+                            }
+                          }}
+                          className="p-2 bg-green-500/10 text-green-500 hover:bg-green-500/20 rounded-lg transition-all border border-green-500/20"
+                          title="Dar Baixa (Pronto)"
+                        >
+                          <CheckCircle size={18} />
+                        </button>
+                      )}
                       {(sale.status === 'PRONTA' || sale.status === 'ENTREGUE' || sale.status === 'CONCLUIDO' || sale.status === 'FINALIZADO') && (
                         <button 
                           onClick={async () => {

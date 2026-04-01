@@ -1,4 +1,5 @@
 import React from 'react';
+import { getEffectiveAddress } from '../lib/storage';
 
 interface PrintOSProps {
   sale: any;
@@ -34,8 +35,8 @@ const PrintOS: React.FC<PrintOSProps> = ({ sale, settings }) => {
         <div className="space-y-1.5">
           <h1 className="text-4xl font-black uppercase tracking-tighter text-black">Ótica Lìs</h1>
           <p className="text-sm font-bold text-black/80">CNPJ: 39.156.577/0001-22</p>
-          <p className="text-xs text-black/60 leading-relaxed max-w-sm">
-            Avenida Anápolis Qd 03 Lt 01 - Nª 2134 - Vila Concórdia - Cep 74770-270
+          <p className="text-xs text-black font-bold border-l-4 border-[#FFD700] pl-3 py-1 bg-black/5 rounded-r-lg max-w-md">
+            {getEffectiveAddress(sale.data || sale.criado_em)}
           </p>
         </div>
         <div className="text-right space-y-1 border-2 border-black p-5 rounded-xl bg-[#FFD700] shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">

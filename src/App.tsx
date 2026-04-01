@@ -6,6 +6,7 @@ import {
   useLocation,
   Outlet
 } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import {
   LayoutDashboard,
   Users,
@@ -29,6 +30,69 @@ import FiscalPage from './pages/FiscalPage';
 import SettingsPage from './pages/SettingsPage';
 import LoginPage from './pages/LoginPage';
 import ProtectedRoute from './components/ProtectedRoute';
+import { notificationService } from './lib/notificationService';
+import type { AppNotification } from './lib/notificationService';
+
+function NotificationBell() {
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [isOpen, setIsOpen] = useState(false);
+
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      const active = await notificationService.getActiveNotifications();
+      setNotifications(active);
+    };
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, []);
+
+  const unreadCount = notifications.length;
+
+  return (
+    <div className="relative">
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className="p-2 rounded-full hover:bg-white/5 transition-colors relative"
+      >
+        <Bell size={20} className={unreadCount > 0 ? "text-primary animate-pulse" : "text-white/70"} />
+        {unreadCount > 0 && (
+          <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-surface"></span>
+        )}
+      </button>
+
+      {isOpen && (
+        <div className="absolute right-0 mt-4 w-80 bg-surface border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
+          <div className="p-4 border-b border-white/5 bg-white/[0.02] flex justify-between items-center">
+            <h4 className="font-bold text-sm">Notificações</h4>
+            <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-black uppercase">{unreadCount} Novas</span>
+          </div>
+          <div className="max-h-[400px] overflow-y-auto">
+            {notifications.length === 0 ? (
+              <div className="p-8 text-center text-white/20 italic text-sm">
+                Tudo em ordem por aqui!
+              </div>
+            ) : (
+              notifications.map(n => (
+                <div key={n.id} className="p-4 border-b border-white/5 hover:bg-white/[0.02] transition-colors cursor-pointer group">
+                  <div className="flex gap-3">
+                    <div className={`p-2 rounded-lg h-fit ${n.type === 'EXAM' ? 'bg-blue-500/10 text-blue-500' : 'bg-yellow-500/10 text-yellow-500'}`}>
+                      {n.type === 'EXAM' ? <Calendar size={14} /> : <Package size={14} />}
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-white group-hover:text-primary transition-colors">{n.title}</p>
+                      <p className="text-[11px] text-white/40 leading-relaxed mt-0.5">{n.message}</p>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function Layout() {
   const location = useLocation();
@@ -131,10 +195,7 @@ function Layout() {
             />
           </div>
           <div className="flex items-center gap-4">
-            <button className="p-2 rounded-full hover:bg-white/5 transition-colors relative">
-              <Bell size={20} className="text-white/70" />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-surface"></span>
-            </button>
+            <NotificationBell />
             <div className="h-8 w-px bg-white/10 mx-2"></div>
             <div className="text-right">
               <p className="text-xs text-white/40">Sábado, 14 de Março</p>

@@ -6,6 +6,19 @@ const isSupabaseConfigured = () => {
          import.meta.env.VITE_SUPABASE_URL !== 'https://placeholder.supabase.co';
 };
 
+// Auxiliar para pegar o endereço correto baseado na data
+export const getEffectiveAddress = (dateStr?: string) => {
+  // Ajuste para evitar shift de timezone em strings YYYY-MM-DD
+  const dateStrFixed = (dateStr && dateStr.length === 10) ? `${dateStr}T12:00:00` : dateStr;
+  const date = dateStrFixed ? new Date(dateStrFixed) : new Date();
+  
+  //getDay() retorna 5 para Sexta-feira
+  if (date.getDay() === 5) {
+    return "Av das Esmeraldas Qd 42 Lt 14 - Recanto das Minas Gerais";
+  }
+  return "Av Anápolis Qd 03 Lt 01 - Vila Concórdia";
+};
+
 export const storage = {
   // --- CLIENTES ---
   async saveClient(client: any) {
@@ -298,6 +311,57 @@ export const storage = {
     return novaVenda;
   },
 
+  async darBaixaVenda(saleId: string) {
+    const sales = await this.getSales();
+    const index = sales.findIndex((s: any) => s.id === saleId);
+    
+    if (index === -1) throw new Error('Venda não encontrada');
+    
+    const sale = sales[index];
+    if (sale.status === 'PRONTA' || sale.status === 'ENTREGUE') {
+      return sale; // Já baixada
+    }
+
+    // 1. Atualizar Status
+    sale.status = 'PRONTA';
+    sale.data_pronto = new Date().toISOString();
+    
+    // 2. Registrar no Caixa (se for pagamento imediato e caixa aberto)
+    try {
+      const caixa = await this.getCaixaAtual();
+      if (caixa) {
+        const todosCaixas = JSON.parse(localStorage.getItem('lis_caixas') || '[]');
+        const cIdx = todosCaixas.findIndex((c: any) => c.id === caixa.id);
+        if (cIdx !== -1) {
+          const forma = (sale.forma_pagamento || '').toLowerCase();
+          const valor = Number(sale.valor_total || 0);
+          
+          if (forma.includes('dinheiro')) todosCaixas[cIdx].entradas.dinheiro += valor;
+          else if (forma.includes('pix')) todosCaixas[cIdx].entradas.pix += valor;
+          else todosCaixas[cIdx].entradas.cartao += valor;
+          
+          localStorage.setItem('lis_caixas', JSON.stringify(todosCaixas));
+        }
+      }
+    } catch (e) {
+      console.error('Erro ao atualizar caixa na baixa', e);
+    }
+
+    // 3. Atualizar Financeiro (Se era pendente, marcar como pago)
+    const { receber } = await this.getFinanceiro();
+    const contaIdx = receber.findIndex((r: any) => r.venda_id === saleId);
+    if (contaIdx !== -1) {
+      receber[contaIdx].status = 'PAGO';
+      localStorage.setItem('lis_contas_receber', JSON.stringify(receber));
+    }
+
+    // 4. Salvar venda atualizada
+    sales[index] = sale;
+    localStorage.setItem('lis_vendas', JSON.stringify(sales));
+
+    return sale;
+  },
+
   async updateSaleStatus(saleId: string, newStatus: string) {
     const sales = await this.getSales();
     const index = sales.findIndex((s: any) => s.id === saleId);
@@ -434,6 +498,12 @@ export const storage = {
       sistema: {
         trava_caixa: true,
         termos_garantia: 'Garantia de 1 ano para defeitos de fabricação.'
+      },
+      sicoob: {
+        clientId: '',
+        certificateName: '',
+        configured: false,
+        lastSync: null
       }
     };
     const settings = JSON.parse(localStorage.getItem('lis_settings') || 'null');

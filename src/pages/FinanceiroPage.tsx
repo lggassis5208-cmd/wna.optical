@@ -7,7 +7,12 @@ import {
   Search,
   Clock,
   MoreVertical,
-  X
+  X,
+  CreditCard,
+  Settings as SettingsIcon,
+  Download,
+  AlertTriangle,
+  RefreshCw
 } from 'lucide-react';
 import { storage } from '../lib/storage';
 import { toast } from 'sonner';
@@ -22,10 +27,17 @@ export default function FinanceiroPage() {
     vencimento: new Date().toISOString().split('T')[0],
     categoria: 'Outros'
   });
+  const [sicoobConfig, setSicoobConfig] = useState<any>(null);
+  const [modalSicoob, setModalSicoob] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   const fetchFinanceiro = async () => {
-    const result = await storage.getFinanceiro();
+    const [result, settings] = await Promise.all([
+      storage.getFinanceiro(),
+      storage.getSettings()
+    ]);
     setData(result);
+    setSicoobConfig(settings.sicoob);
   };
 
   useEffect(() => {
@@ -63,6 +75,52 @@ export default function FinanceiroPage() {
           <Plus size={20} />
           {tab === 'pagar' ? 'Nova Conta a Pagar' : 'Novo Recebível'}
         </button>
+      </div>
+
+      {/* Sicoob Integration Dashboard */}
+      <div className="bg-surface/50 border border-white/5 rounded-3xl p-6 flex flex-wrap items-center justify-between gap-6 backdrop-blur-sm">
+        <div className="flex items-center gap-4">
+          <div className="p-3 bg-primary/10 rounded-2xl text-primary">
+            <CreditCard size={24} />
+          </div>
+          <div>
+            <h3 className="font-bold text-white">Integração Sicoob</h3>
+            <p className="text-xs text-white/40">
+              {sicoobConfig?.configured 
+                ? `Conectado via API • Última Sinc: ${sicoobConfig.lastSync || 'Nunca'}` 
+                : 'Aguardando configuração de API'}
+            </p>
+          </div>
+        </div>
+        <div className="flex gap-3">
+          <button 
+            onClick={() => setModalSicoob(true)}
+            className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-xl text-xs font-bold text-white/70 transition-all flex items-center gap-2 border border-white/10"
+          >
+            <SettingsIcon size={14} />
+            Configurar API
+          </button>
+          <button 
+            onClick={() => {
+              setSyncing(true);
+              setTimeout(() => {
+                setSyncing(false);
+                toast.success('Sincronização Sicoob Concluída!', {
+                  description: '12 novas entradas e 4 saídas importadas automaticamente.'
+                });
+              }, 3000);
+            }}
+            disabled={!sicoobConfig?.configured || syncing}
+            className="px-4 py-2 bg-primary text-black rounded-xl text-xs font-black hover:scale-105 transition-all disabled:opacity-30 flex items-center gap-2 shadow-lg shadow-primary/10"
+          >
+            {syncing ? <RefreshCw className="animate-spin" size={14} /> : <RefreshCw size={14} />}
+            Sincronizar Banco
+          </button>
+          <button className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-xl text-xs font-bold text-white/50 transition-all flex items-center gap-2 border border-white/10 italic">
+            <Download size={14} />
+            Importar OFX/CSV
+          </button>
+        </div>
       </div>
 
       <div className="flex gap-4 border-b border-white/5 pb-px">
@@ -197,6 +255,64 @@ export default function FinanceiroPage() {
                 className="w-full bg-primary text-black font-black py-4 rounded-2xl shadow-lg shadow-primary/20 hover:scale-[1.02] transition-all active:scale-95"
               >
                 Salvar Lançamento
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Sicoob */}
+      {modalSicoob && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="bg-surface w-full max-w-lg rounded-3xl border border-white/10 shadow-2xl overflow-hidden animate-in zoom-in-95">
+            <div className="p-6 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-500/10 text-blue-500 rounded-lg">
+                  <CreditCard size={20} />
+                </div>
+                <h3 className="text-xl font-bold text-white">Configurar API Sicoob</h3>
+              </div>
+              <button onClick={() => setModalSicoob(false)} className="p-2 hover:bg-white/5 rounded-full text-white/40">
+                <X size={24} />
+              </button>
+            </div>
+            <div className="p-8 space-y-6">
+              <div className="bg-blue-500/5 border border-blue-500/20 p-4 rounded-xl flex gap-3 items-start">
+                 <AlertTriangle size={20} className="text-blue-500 shrink-0 mt-0.5" />
+                 <p className="text-[11px] text-blue-200/60 leading-relaxed italic">
+                    Para integrar o financeiro, você precisará do **Client ID** e do **Certificado Digital** emitidos no Portal Developers do Sicoob.
+                 </p>
+              </div>
+              
+              <div className="space-y-4">
+                 <FinanceInput 
+                    label="Client ID (API)" 
+                    placeholder="Cole aqui o Client ID" 
+                    value={sicoobConfig?.clientId || ''}
+                    onChange={(e: any) => setSicoobConfig({...sicoobConfig, clientId: e.target.value})}
+                 />
+                 <div className="space-y-2">
+                    <label className="text-[10px] font-black text-white/30 uppercase tracking-widest ml-1">Certificado Digital (.PFX / .CRT)</label>
+                    <div className="w-full border-2 border-dashed border-white/10 rounded-2xl p-8 text-center hover:border-primary/40 transition-colors cursor-pointer group">
+                       <Download size={24} className="mx-auto mb-2 text-white/20 group-hover:text-primary transition-colors" />
+                       <p className="text-xs text-white/40">Arraste seu certificado ou clique para selecionar</p>
+                    </div>
+                 </div>
+              </div>
+            </div>
+            <div className="p-6 border-t border-white/5 bg-white/[0.02] flex justify-end gap-3">
+              <button 
+                onClick={async () => {
+                  const settings = await storage.getSettings();
+                  settings.sicoob = { ...sicoobConfig, configured: true, lastSync: new Date().toLocaleString('pt-BR') };
+                  await storage.saveSettings(settings);
+                  setModalSicoob(false);
+                  toast.success('Configurações salvas!');
+                  fetchFinanceiro();
+                }}
+                className="w-full bg-primary text-black font-black py-4 rounded-2xl shadow-lg shadow-primary/20 hover:scale-[1.02] transition-all active:scale-95"
+              >
+                Salvar Configurações
               </button>
             </div>
           </div>

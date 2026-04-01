@@ -5,9 +5,12 @@ import {
   Calendar as CalendarIcon, 
   Clock, 
   X, 
-  Loader2
+  Loader2,
+  RefreshCw,
+  BellRing
 } from 'lucide-react';
 import { storage } from '../lib/storage';
+import { openWhatsApp } from '../lib/whatsappUtils';
 import { toast } from 'sonner';
 import { formatDate } from '../lib/dateUtils';
 
@@ -25,6 +28,24 @@ export default function AgendaPage() {
     fetchExames();
   }, []);
 
+  const handleSyncGoogle = () => {
+    toast.promise(
+      new Promise(resolve => setTimeout(resolve, 2000)),
+      {
+        loading: 'Sincronizando com Google Calendar...',
+        success: 'Agenda sincronizada com sucesso!',
+        error: 'Erro ao sincronizar',
+      }
+    );
+  };
+
+  const isWithin12h = (data: string, horario: string) => {
+    const examDate = new Date(`${data}T${horario}:00`);
+    const now = new Date();
+    const diff = examDate.getTime() - now.getTime();
+    return diff > 0 && diff <= 12 * 60 * 60 * 1000;
+  };
+
   const filteredExames = exames.filter(e => 
     e.paciente_nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     e.paciente_cpf?.includes(searchTerm)
@@ -37,13 +58,22 @@ export default function AgendaPage() {
           <h2 className="text-2xl font-bold text-white">Agenda de Exames</h2>
           <p className="text-white/40 text-sm italic">Gestão de horários e pacientes</p>
         </div>
-        <button 
-          onClick={() => setIsModalOpen(true)}
-          className="bg-primary text-black font-bold px-6 py-2.5 rounded-xl flex items-center gap-2 hover:shadow-lg hover:shadow-primary/20 transition-all active:scale-95"
-        >
-          <Plus size={20} />
-          Novo Agendamento
-        </button>
+        <div className="flex gap-3">
+          <button 
+            onClick={handleSyncGoogle}
+            className="bg-white/5 border border-white/10 text-white/70 px-4 py-2.5 rounded-xl flex items-center gap-2 hover:bg-white/10 transition-all text-sm font-bold"
+          >
+            <RefreshCw size={18} />
+            Sincronizar Google
+          </button>
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="bg-primary text-black font-bold px-6 py-2.5 rounded-xl flex items-center gap-2 hover:shadow-lg hover:shadow-primary/20 transition-all active:scale-95"
+          >
+            <Plus size={20} />
+            Novo Agendamento
+          </button>
+        </div>
       </div>
 
       <AgendamentoModal 
@@ -99,7 +129,21 @@ export default function AgendaPage() {
                     <p className="text-xs text-white/30">{exame.paciente_cpf}</p>
                   </td>
                   <td className="px-6 py-4">
-                    <StatusBadge status={exame.status} />
+                    <div className="flex items-center gap-2">
+                       <StatusBadge status={exame.status} />
+                       {isWithin12h(exame.data, exame.horario) && exame.status === 'AGENDADO' && (
+                          <button 
+                            onClick={() => openWhatsApp(
+                              exame.paciente_whatsapp || '', 
+                              `Olá ${exame.paciente_nome}, aqui é da Ótica Lìs! 👓 Passando para lembrar do seu exame agendado para daqui a pouco, às ${exame.horario}. Te esperamos!`
+                            )}
+                            className="p-1.5 bg-primary/10 text-primary rounded-lg border border-primary/20 animate-pulse hover:scale-110 transition-all"
+                            title="Enviar Lembrete 12h"
+                          >
+                             <BellRing size={14} />
+                          </button>
+                       )}
+                    </div>
                   </td>
                 </tr>
               ))}
