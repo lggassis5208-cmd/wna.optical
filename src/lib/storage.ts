@@ -168,7 +168,8 @@ export const storage = {
       saldo_inicial: saldoInicial,
       entradas: { dinheiro: 0, pix: 0, cartao: 0 },
       saidas: 0,
-      vendas: []
+      vendas: [],
+      movimentacoes: []
     };
 
     todos.push(novoCaixa);
@@ -294,7 +295,21 @@ export const storage = {
       else if (forma.includes('pix')) todosCaixas[caixaIndex].entradas.pix += valor;
       else todosCaixas[caixaIndex].entradas.cartao += valor;
       
+      
       todosCaixas[caixaIndex].vendas.push(novaVenda.id);
+      if (!todosCaixas[caixaIndex].movimentacoes) todosCaixas[caixaIndex].movimentacoes = [];
+      
+      todosCaixas[caixaIndex].movimentacoes.push({
+        id: Math.random().toString(36).substr(2, 9),
+        horario: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        tipo: 'ENTRADA',
+        descricao: `Venda ${novaVenda.os_number} - ${sale.paciente_nome || sale.tecnico || 'Cliente'}`,
+        forma_pagamento: sale.forma_pagamento,
+        valor: Number(sale.valor_total),
+        cliente_whatsapp: sale.paciente_whatsapp || sale.cliente_whatsapp || null,
+        status: 'concluído'
+      });
+
       localStorage.setItem('lis_caixas', JSON.stringify(todosCaixas));
     }
 
@@ -360,6 +375,31 @@ export const storage = {
     localStorage.setItem('lis_vendas', JSON.stringify(sales));
 
     return sale;
+  },
+
+  async registrarSaida(caixaId: string, descricao: string, valor: number, formaPagamento: string) {
+    const todosCaixas = JSON.parse(localStorage.getItem('lis_caixas') || '[]');
+    const index = todosCaixas.findIndex((c: any) => c.id === caixaId);
+    
+    if (index !== -1) {
+      todosCaixas[index].saidas += Number(valor);
+      
+      if (!todosCaixas[index].movimentacoes) todosCaixas[index].movimentacoes = [];
+      
+      todosCaixas[index].movimentacoes.push({
+        id: Math.random().toString(36).substr(2, 9),
+        horario: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        tipo: 'SAIDA',
+        descricao: descricao,
+        forma_pagamento: formaPagamento,
+        valor: Number(valor),
+        status: 'concluído'
+      });
+
+      localStorage.setItem('lis_caixas', JSON.stringify(todosCaixas));
+      return todosCaixas[index];
+    }
+    return null;
   },
 
   async updateSaleStatus(saleId: string, newStatus: string) {
