@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   X, 
   Glasses, 
@@ -11,6 +11,7 @@ import {
   Lock,
   Printer,
   CheckCircle2,
+  User,
   MessageSquare,
   Gift,
   ExternalLink,
@@ -39,11 +40,33 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
   const [isSuccess, setIsSuccess] = useState(false);
   const [client, setClient] = useState<any>(null);
 
+  // --- Estados de busca inteligente de clientes ---
+  const [clients, setClients] = useState<any[]>([]);
+  const [clientSearch, setClientSearch] = useState('');
+  const [showClientDropdown, setShowClientDropdown] = useState(false);
+  const [clienteNome, setClienteNome] = useState('');
+  const [clienteCpf, setClienteCpf] = useState('');
+  const [clienteWhatsapp, setClienteWhatsapp] = useState('');
+  const clientDropdownRef = useRef<HTMLDivElement>(null);
+
+  // --- Estados de produtos do estoque ---
+  const [products, setProducts] = useState<any[]>([]);
+  const [selectedProductId, setSelectedProductId] = useState('');
+  const [selectedArmacaoId, setSelectedArmacaoId] = useState('');
+
   const [sefazLoading, setSefazLoading] = useState(false);
   const [sefazSuccess, setSefazSuccess] = useState(false);
   const [sefazError, setSefazError] = useState('');
   const [danfeUrl, setDanfeUrl] = useState('');
   const [notaInfo, setNotaInfo] = useState<{ xml: string, chave: string } | null>(null);
+
+  const [lenteSearch, setLenteSearch] = useState('');
+  const [showLenteDropdown, setShowLenteDropdown] = useState(false);
+  const lenteDropdownRef = useRef<HTMLDivElement>(null);
+
+  const [armacaoSearch, setArmacaoSearch] = useState('');
+  const [showArmacaoDropdown, setShowArmacaoDropdown] = useState(false);
+  const armacaoDropdownRef = useRef<HTMLDivElement>(null);
 
   const handleEmitirNfe = async (sale: any) => {
     if (!sale) return;
@@ -121,23 +144,118 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
     setFormData(prev => ({ ...prev, valor_total: total.toFixed(2) }));
   }, [formData.valor_base, formData.desconto, formData.is_birthday_discount]);
 
-  // Busca automática de produto ao mudar lente/tratamento
+  // Carrega clientes e produtos quando o modal abre
   useEffect(() => {
-    const searchProduct = async () => {
-      if (formData.tipo_lente && formData.tratamento) {
-        const products = await storage.getProducts();
-        const found = products.find((p: any) => 
-          p.nome.toLowerCase().includes(formData.tipo_lente.toLowerCase()) && 
-          p.nome.toLowerCase().includes(formData.tratamento.toLowerCase())
-        );
-        if (found) {
-          setFormData(prev => ({ ...prev, valor_base: found.preco_venda.toString() }));
-          toast.info(`Produto encontrado: ${found.nome}`);
-        }
+    if (isOpen) {
+      const loadData = async () => {
+        const [clientsData, productsData] = await Promise.all([
+          storage.getClients(),
+          storage.getProducts()
+        ]);
+        setClients(clientsData || []);
+        setProducts(productsData || []);
+      };
+      loadData();
+    }
+  }, [isOpen]);
+
+  // Fecha dropdown de cliente ao clicar fora
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (clientDropdownRef.current && !clientDropdownRef.current.contains(e.target as Node)) {
+        setShowClientDropdown(false);
+      }
+      if (lenteDropdownRef.current && !lenteDropdownRef.current.contains(e.target as Node)) {
+        setShowLenteDropdown(false);
+      }
+      if (armacaoDropdownRef.current && !armacaoDropdownRef.current.contains(e.target as Node)) {
+        setShowArmacaoDropdown(false);
       }
     };
-    searchProduct();
-  }, [formData.tipo_lente, formData.tratamento]);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Filtra clientes conforme busca
+  const filteredClients = clients.filter((c: any) => {
+    if (!clientSearch.trim()) return false;
+    const term = clientSearch.toLowerCase();
+    const nome = (c.nome_completo || c.name || '').toLowerCase();
+    const cpf = (c.cpf || '').replace(/\D/g, '');
+    const searchClean = term.replace(/\D/g, '');
+    return nome.includes(term) || (searchClean && cpf.includes(searchClean));
+  }).slice(0, 5);
+
+  // Seleciona um cliente do dropdown
+  const handleSelectClient = (c: any) => {
+    setFormData(prev => ({ ...prev, cliente_id: c.id }));
+    setClienteNome(c.nome_completo || c.name || '');
+    setClienteCpf(c.cpf || '');
+    setClienteWhatsapp(c.whatsapp || '');
+    setClient(c);
+    setClientSearch('');
+    setShowClientDropdown(false);
+  };
+
+  // Remove cliente selecionado
+  const handleClearClient = () => {
+    setFormData(prev => ({ ...prev, cliente_id: '' }));
+    setClienteNome('');
+    setClienteCpf('');
+    setClienteWhatsapp('');
+    setClient(null);
+    setClientSearch('');
+  };
+
+  // Seleciona produto (lente) do dropdown
+  const handleSelectProduct = (productId: string) => {
+    setSelectedProductId(productId);
+    const prod = products.find((p: any) => p.id === productId);
+    if (prod) {
+      const nomeParts = (prod.nome || '').split(' ');
+      const tipoLente = nomeParts.find((p: string) => ['LP', 'BVS', 'MULTIFOCAL'].includes(p.toUpperCase())) || prod.categoria || prod.nome;
+      const tratamento = nomeParts.filter((p: string) => !['Lente', 'LP', 'BVS', 'MULTIFOCAL'].includes(p)).join(' ') || '';
+      setFormData(prev => ({
+        ...prev,
+        tipo_lente: tipoLente,
+        tratamento: tratamento,
+        valor_base: (prod.preco_venda || 0).toString()
+      }));
+      toast.info(`Produto selecionado: ${prod.nome} - R$ ${Number(prod.preco_venda || 0).toFixed(2)}`);
+    } else {
+      setFormData(prev => ({ ...prev, tipo_lente: '', tratamento: '', valor_base: '0.00' }));
+    }
+  };
+
+  // Seleciona armação do dropdown
+  const handleSelectArmacao = (armacaoId: string) => {
+    setSelectedArmacaoId(armacaoId);
+    const arm = products.find((p: any) => p.id === armacaoId);
+    if (arm) {
+      const currentBase = parseFloat(formData.valor_base) || 0;
+      // Soma o valor da armação ao valor base
+      setFormData(prev => ({
+        ...prev,
+        valor_base: (currentBase + (arm.preco_venda || 0)).toString()
+      }));
+      toast.info(`Armação adicionada: ${arm.nome} - R$ ${Number(arm.preco_venda || 0).toFixed(2)}`);
+    }
+  };
+
+  // Listas derivadas de produtos
+  const lentesProducts = products.filter((p: any) => {
+    const cat = (p.categoria || '').toLowerCase();
+    const matchesSearch = lenteSearch ? p.nome.toLowerCase().includes(lenteSearch.toLowerCase()) : true;
+    return !cat.includes('arma') && !cat.includes('acessório') && matchesSearch;
+  });
+
+  const armacaoProducts = products.filter((p: any) => {
+    const cat = (p.categoria || '').toLowerCase();
+    const nome = (p.nome || '').toLowerCase();
+    const isArmacao = cat.includes('arma') || nome.includes('arma');
+    const matchesSearch = armacaoSearch ? p.nome.toLowerCase().includes(armacaoSearch.toLowerCase()) : true;
+    return isArmacao && matchesSearch;
+  });
 
   const checkCaixa = async () => {
     setCheckingCaixa(true);
@@ -165,6 +283,11 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
     try {
       const saleToSave = {
         ...formData,
+        cliente_nome: clienteNome,
+        paciente_cpf: clienteCpf,
+        cliente_whatsapp: clienteWhatsapp,
+        paciente_nome: clienteNome,
+        paciente_whatsapp: clienteWhatsapp,
         od_esferico: parseFloat(formData.od_esferico) || 0,
         od_cilindrico: parseFloat(formData.od_cilindrico) || 0,
         od_eixo: parseInt(formData.od_eixo) || 0,
@@ -184,14 +307,15 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
       toast.success('Venda Salva com Sucesso');
       setSavedSale(result);
       
-      // Buscar dados do cliente para o WhatsApp
-      if (formData.cliente_id) {
-        const clients = await storage.getClients();
-        const c = clients.find((cl: any) => cl.id === formData.cliente_id);
-        setClient(c);
-      }
+      // Usa diretamente o client já selecionado (não precisa buscar de novo)
+      // O state `client` já foi setado em handleSelectClient
 
       setIsSuccess(true);
+      
+      // Impressão obrigatória em PDF A4 ao finalizar
+      setTimeout(() => {
+        window.print();
+      }, 500);
     } catch (error: any) {
       toast.error('Erro ao salvar venda');
     } finally {
@@ -209,6 +333,16 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
     setSefazError('');
     setDanfeUrl('');
     setNotaInfo(null);
+    // Reset estados de cliente e produto
+    setClientSearch('');
+    setShowClientDropdown(false);
+    handleClearClient();
+    setSelectedProductId('');
+    setSelectedArmacaoId('');
+    setLenteSearch('');
+    setArmacaoSearch('');
+    setShowLenteDropdown(false);
+    setShowArmacaoDropdown(false);
     onClose();
   };
 
@@ -264,72 +398,217 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
              <div className="h-full flex items-center justify-center">
                 <Loader2 className="animate-spin text-primary" size={40} />
              </div>
-          ) : (
-            <>
-              {step === 1 && (
+                      {step === 1 && (
             <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
+              {/* === BUSCA INTELIGENTE DE CLIENTES === */}
               <section className="space-y-4">
                 <h4 className="text-xs font-bold text-white/20 uppercase tracking-widest border-b border-white/5 pb-2">Identificação do Cliente</h4>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" size={18} />
-                  <input 
-                    type="text" 
-                    placeholder="Buscar cliente por nome ou CPF..." 
-                    className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-sm focus:outline-none focus:border-primary/50 transition-colors"
-                  />
-                </div>
+                
+                {formData.cliente_id && clienteNome ? (
+                  // Card do cliente selecionado
+                  <div className="flex items-center gap-4 bg-primary/5 border border-primary/20 rounded-xl p-4">
+                    <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center text-primary shrink-0">
+                      <User size={20} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-white truncate">{clienteNome}</p>
+                      <div className="flex items-center gap-3 text-xs text-white/40">
+                        {clienteCpf && <span>CPF: {clienteCpf}</span>}
+                        {clienteWhatsapp && <span>WhatsApp: {clienteWhatsapp}</span>}
+                      </div>
+                    </div>
+                    <button 
+                      onClick={handleClearClient}
+                      className="p-1.5 hover:bg-white/10 rounded-full transition-colors text-white/40 hover:text-red-400 shrink-0"
+                      title="Remover cliente"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                ) : (
+                  // Combobox de busca
+                  <div className="relative" ref={clientDropdownRef}>
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" size={18} />
+                    <input 
+                      type="text" 
+                      placeholder="Buscar cliente por nome ou CPF..." 
+                      value={clientSearch}
+                      onChange={(e) => {
+                        setClientSearch(e.target.value);
+                        setShowClientDropdown(true);
+                      }}
+                      onFocus={() => clientSearch.trim() && setShowClientDropdown(true)}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-sm focus:outline-none focus:border-primary/50 transition-colors"
+                    />
+                    {/* Dropdown de resultados */}
+                    {showClientDropdown && filteredClients.length > 0 && (
+                      <div className="absolute z-50 w-full mt-1 bg-surface border border-white/10 rounded-xl shadow-2xl overflow-hidden max-h-60 overflow-y-auto">
+                        {filteredClients.map((c: any) => (
+                          <button
+                            key={c.id}
+                            onClick={() => handleSelectClient(c)}
+                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors text-left border-b border-white/5 last:border-b-0"
+                          >
+                            <div className="w-8 h-8 bg-white/5 rounded-full flex items-center justify-center text-white/30 shrink-0">
+                              <User size={14} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold text-white truncate">{c.nome_completo || c.name}</p>
+                              <p className="text-xs text-white/30">
+                                {c.cpf && `CPF: ${c.cpf}`}
+                                {c.cpf && c.whatsapp && ' · '}
+                                {c.whatsapp && `WhatsApp: ${c.whatsapp}`}
+                              </p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {showClientDropdown && clientSearch.trim() && filteredClients.length === 0 && (
+                      <div className="absolute z-50 w-full mt-1 bg-surface border border-white/10 rounded-xl shadow-2xl p-4 text-center">
+                        <p className="text-xs text-white/30 italic">Nenhum cliente encontrado para "{clientSearch}"</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </section>
 
-              <section className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-8">
+              <section className="grid grid-cols-1 gap-6 pb-8">
+                {/* === SELEÇÃO DE PRODUTOS DO ESTOQUE === */}
                 <div className="space-y-4">
-                  <h4 className="text-xs font-bold text-white/20 uppercase tracking-widest border-b border-white/5 pb-2">Técnico / Responsável</h4>
-                  <InputGroup 
-                    label="Nome do Técnico" 
-                    placeholder="Ex: Roberto Silva" 
-                    value={formData.tecnico}
-                    onChange={(e) => setFormData({...formData, tecnico: e.target.value})}
-                  />
-                </div>
-                <div className="space-y-4">
-                  <h4 className="text-xs font-bold text-white/20 uppercase tracking-widest border-b border-white/5 pb-2">Especificações da Lente</h4>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                       <label className="text-[10px] font-bold text-white/30 uppercase ml-1">Tipo de Lente</label>
-                       <select 
-                         className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-4 text-sm text-white focus:border-primary/50"
-                         value={formData.tipo_lente}
-                         onChange={(e) => setFormData({...formData, tipo_lente: e.target.value})}
-                       >
-                         <option value="">Selecione...</option>
-                         <option value="LP">LP (Lente Pronta)</option>
-                         <option value="BVS">BVS (Visão Simples)</option>
-                         <option value="MULTIFOCAL">Multifocal</option>
-                       </select>
+                  <h4 className="text-xs font-bold text-white/20 uppercase tracking-widest border-b border-white/5 pb-2">Lente do Estoque</h4>
+                  
+                  {selectedProductId ? (
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center gap-4 bg-primary/5 border border-primary/20 rounded-xl p-4">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold text-white truncate">{products.find(p => p.id === selectedProductId)?.nome}</p>
+                          <p className="text-xs text-white/40">R$ {Number(products.find(p => p.id === selectedProductId)?.preco_venda || 0).toFixed(2)}</p>
+                        </div>
+                        <button 
+                          onClick={() => {
+                            setSelectedProductId('');
+                            setFormData(prev => ({ ...prev, tipo_lente: '', tratamento: '', valor_base: selectedArmacaoId ? products.find(p => p.id === selectedArmacaoId)?.preco_venda?.toString() || '0' : '0' }));
+                          }}
+                          className="p-1.5 hover:bg-white/10 rounded-full transition-colors text-white/40 hover:text-red-400 shrink-0"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                      <div className="bg-white/[0.03] border border-white/5 rounded-lg p-3 text-xs text-white/40 space-y-1">
+                        <p><span className="text-white/60 font-semibold">Tipo:</span> {formData.tipo_lente}</p>
+                        <p><span className="text-white/60 font-semibold">Tratamento:</span> {formData.tratamento || '—'}</p>
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                       <label className="text-[10px] font-bold text-white/30 uppercase ml-1">Tratamento</label>
-                       <select 
-                         className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-4 text-sm text-white focus:border-primary/50"
-                         value={formData.tratamento}
-                         onChange={(e) => setFormData({...formData, tratamento: e.target.value})}
-                       >
-                         <option value="">Selecione...</option>
-                         <option value="Crizal">Crizal (Azul)</option>
-                         <option value="Video Filter">Video Filter (Roxo)</option>
-                         <option value="Sapphire">Sapphire (Verde)</option>
-                         <option value="Easy">Easy (Prata)</option>
-                       </select>
+                  ) : (
+                    <div className="relative" ref={lenteDropdownRef}>
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" size={18} />
+                      <input 
+                        type="text" 
+                        placeholder="Buscar lente no estoque..." 
+                        value={lenteSearch}
+                        onChange={(e) => {
+                          setLenteSearch(e.target.value);
+                          setShowLenteDropdown(true);
+                        }}
+                        onFocus={() => setShowLenteDropdown(true)}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-sm focus:outline-none focus:border-primary/50 transition-colors"
+                      />
+                      {showLenteDropdown && (
+                        <div className="absolute z-50 w-full mt-1 bg-surface border border-white/10 rounded-xl shadow-2xl overflow-hidden max-h-60 overflow-y-auto">
+                          {lentesProducts.length > 0 ? lentesProducts.map((p: any) => (
+                            <button
+                              key={p.id}
+                              onClick={() => {
+                                handleSelectProduct(p.id);
+                                setShowLenteDropdown(false);
+                                setLenteSearch('');
+                              }}
+                              className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/5 transition-colors text-left border-b border-white/5 last:border-b-0"
+                            >
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-semibold text-white truncate">{p.nome}</p>
+                                <p className="text-xs text-white/30">Estoque: {p.estoque ?? 0}</p>
+                              </div>
+                              <div className="text-right pl-3">
+                                <p className="text-sm font-bold text-primary">R$ {Number(p.preco_venda || 0).toFixed(2)}</p>
+                              </div>
+                            </button>
+                          )) : (
+                            <div className="p-4 text-center text-xs text-white/30 italic">Nenhuma lente encontrada</div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  </div>
+                  )}
                 </div>
+
+                {/* === SELEÇÃO DE ARMAÇÃO === */}
                 <div className="space-y-4">
-                  <h4 className="text-xs font-bold text-white/20 uppercase tracking-widest border-b border-white/5 pb-2">Observações Técnicas</h4>
-                  <textarea 
-                    className="w-full h-[80px] bg-white/5 border border-white/10 rounded-xl p-4 text-sm focus:outline-none focus:border-primary/50 transition-colors resize-none"
-                    placeholder="Detalhes adicionais para o laboratório..."
-                  />
+                  <h4 className="text-xs font-bold text-white/20 uppercase tracking-widest border-b border-white/5 pb-2">Armação do Estoque</h4>
+                  
+                  {selectedArmacaoId ? (
+                    <div className="flex items-center gap-4 bg-primary/5 border border-primary/20 rounded-xl p-4">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-white truncate">{products.find(p => p.id === selectedArmacaoId)?.nome}</p>
+                        <p className="text-xs text-white/40">R$ {Number(products.find(p => p.id === selectedArmacaoId)?.preco_venda || 0).toFixed(2)}</p>
+                      </div>
+                      <button 
+                        onClick={() => {
+                          setSelectedArmacaoId('');
+                          const currentLente = products.find(p => p.id === selectedProductId);
+                          setFormData(prev => ({ ...prev, valor_base: currentLente ? currentLente.preco_venda?.toString() : '0' }));
+                        }}
+                        className="p-1.5 hover:bg-white/10 rounded-full transition-colors text-white/40 hover:text-red-400 shrink-0"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="relative" ref={armacaoDropdownRef}>
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" size={18} />
+                      <input 
+                        type="text" 
+                        placeholder="Buscar armação no estoque..." 
+                        value={armacaoSearch}
+                        onChange={(e) => {
+                          setArmacaoSearch(e.target.value);
+                          setShowArmacaoDropdown(true);
+                        }}
+                        onFocus={() => setShowArmacaoDropdown(true)}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-sm focus:outline-none focus:border-primary/50 transition-colors"
+                      />
+                      {showArmacaoDropdown && (
+                        <div className="absolute z-50 w-full mt-1 bg-surface border border-white/10 rounded-xl shadow-2xl overflow-hidden max-h-60 overflow-y-auto">
+                          {armacaoProducts.length > 0 ? armacaoProducts.map((p: any) => (
+                            <button
+                              key={p.id}
+                              onClick={() => {
+                                handleSelectArmacao(p.id);
+                                setShowArmacaoDropdown(false);
+                                setArmacaoSearch('');
+                              }}
+                              className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/5 transition-colors text-left border-b border-white/5 last:border-b-0"
+                            >
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-semibold text-white truncate">{p.nome}</p>
+                                <p className="text-xs text-white/30">Estoque: {p.estoque ?? 0}</p>
+                              </div>
+                              <div className="text-right pl-3">
+                                <p className="text-sm font-bold text-primary">R$ {Number(p.preco_venda || 0).toFixed(2)}</p>
+                              </div>
+                            </button>
+                          )) : (
+                            <div className="p-4 text-center text-xs text-white/30 italic">Nenhuma armação encontrada</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </section>
+            </div>
+          )}ion>
             </div>
           )}
 

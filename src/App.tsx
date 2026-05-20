@@ -29,6 +29,7 @@ import InventoryPage from './pages/InventoryPage';
 import FiscalPage from './pages/FiscalPage';
 import SettingsPage from './pages/SettingsPage';
 import LoginPage from './pages/LoginPage';
+import TestAutomatedPage from './pages/TestAutomatedPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import { notificationService } from './lib/notificationService';
 import type { AppNotification } from './lib/notificationService';
@@ -213,6 +214,12 @@ function Layout() {
             label="Configurações" 
             active={location.pathname === '/settings'} 
           />
+          <NavItem 
+            to="/testes" 
+            icon={<CheckCircle size={20} />} 
+            label="Testes (Auto)" 
+            active={location.pathname === '/testes'} 
+          />
         </nav>
 
         <div className="p-4 border-t border-white/5 bg-black/20">
@@ -300,6 +307,7 @@ function App() {
           <Route path="estoque" element={<InventoryPage />} />
           <Route path="fiscal" element={<FiscalPage />} />
           <Route path="settings" element={<SettingsPage />} />
+          <Route path="testes" element={<TestAutomatedPage />} />
           <Route path="*" element={<div className="flex items-center justify-center h-full text-white/20 italic">Módulo em desenvolvimento...</div>} />
         </Route>
       </Routes>

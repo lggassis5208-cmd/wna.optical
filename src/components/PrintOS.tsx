@@ -9,20 +9,32 @@ interface PrintOSProps {
 const PrintOS: React.FC<PrintOSProps> = ({ sale, settings }) => {
   if (!sale || !settings) return null;
 
-  // Gerar ID ou código fictício
   const osNumberFormatted = (sale.os_number || sale.id?.slice(-6) || '000000').toUpperCase();
+  const dataEmissao = new Date(sale.criado_em || sale.data || Date.now());
+  const endereco = getEffectiveAddress(sale.criado_em || sale.data);
+
+  const formatGrau = (val: any) => {
+    if (!val && val !== 0) return '0.00';
+    const num = Number(val);
+    return num > 0 ? `+${num.toFixed(2)}` : num.toFixed(2);
+  };
 
   return (
-    <div className="print-container hidden print:block bg-white text-black p-6 font-sans leading-tight min-h-screen text-xs">
+    <div className="print-os-container hidden print:block bg-white text-black font-sans min-h-screen" id="print-os">
       <style>{`
         @media print {
+          @page {
+            size: A4;
+            margin: 10mm;
+          }
           body { 
             background: white !important; 
             color: black !important;
             -webkit-print-color-adjust: exact !important; 
-            print-color-adjust: exact !important; 
+            print-color-adjust: exact !important;
+            font-size: 11px;
           }
-          .print-container { 
+          .print-os-container { 
             display: block !important;
             visibility: visible !important;
             position: absolute; 
@@ -31,242 +43,240 @@ const PrintOS: React.FC<PrintOSProps> = ({ sale, settings }) => {
             width: 100%;
             height: auto;
             margin: 0;
-            padding: 1cm;
+            padding: 0;
             background: white !important;
           }
-          #root > :not(.print-container) { display: none !important; }
+          #root > :not(.print-os-container) { display: none !important; }
         }
-        .danfe-border {
-          border: 1px solid #000;
-        }
-        .danfe-title {
-          font-weight: 900;
+        .os-border { border: 1px solid #e5e7eb; }
+        .os-border-light { border: 1px solid #f3f4f6; }
+        .os-section-title {
+          font-weight: 800;
           text-transform: uppercase;
           font-size: 9px;
+          letter-spacing: 0.05em;
           color: #333;
+          background-color: #f9fafb;
+          padding: 6px 10px;
+          border-bottom: 1px solid #e5e7eb;
+          margin: 0;
         }
+        .os-label { font-size: 8px; color: #6b7280; font-weight: 600; text-transform: uppercase; }
+        .os-value { font-size: 10px; color: #111; font-weight: 700; margin-top: 2px; }
       `}</style>
       
-      {/* CABEÇALHO DANFE ESTILO NFe */}
-      <div className="grid grid-cols-12 gap-2 mb-4">
-        {/* LOGO E EMITENTE */}
-        <div className="col-span-7 p-3 danfe-border rounded-lg flex flex-col justify-between">
+      {/* =========================================== */}
+      {/* CABEÇALHO — Logo + Dados da Loja + Nº O.S. */}
+      {/* =========================================== */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #e5e7eb', paddingBottom: '16px', marginBottom: '16px' }}>
+        {/* ESQUERDA: LOGOTIPO OFICIAL E NOME */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ 
+            width: '48px', height: '48px', borderRadius: '8px', 
+            backgroundColor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: '#fff', fontWeight: 900, fontSize: '24px'
+          }}>
+            LÌS
+          </div>
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <div className="w-8 h-8 rounded-lg bg-black flex items-center justify-center text-white font-black text-lg">👓</div>
-              <div>
-                <h1 className="text-xl font-black uppercase tracking-tighter leading-none text-black">Ótica Lìs</h1>
-                <p className="text-[8px] text-gray-500 font-bold uppercase tracking-widest">Excelência em Visão</p>
-              </div>
+            <div style={{ fontSize: '20px', fontWeight: 800, letterSpacing: '-0.5px', lineHeight: 1, color: '#000' }}>
+              ÓTICA LÌS
             </div>
-            <p className="font-bold text-[10px] text-black">ÓTICA LIS LTDA</p>
-            <p className="text-[9px] text-gray-700 leading-normal">
-              Avenida Anápolis Qd 03 Lt 01 - Nª 2134 - Vila Concórdia<br />
-              Goiânia - GO | CEP: 74770-270<br />
-              Fone: (62) 99285-8280
-            </p>
-          </div>
-          <div className="mt-2 pt-2 border-t border-gray-200">
-            <span className="font-bold">CNPJ:</span> 39.156.577/0001-22 | <span className="font-bold">I.E.:</span> 10.784.952-1
+            <div style={{ fontSize: '10px', color: '#4b5563', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '1px', marginTop: '4px' }}>
+              Ordem de Serviço #{osNumberFormatted}
+            </div>
+            <div style={{ fontSize: '9px', color: '#6b7280', marginTop: '4px' }}>
+              Emissão: {dataEmissao.toLocaleDateString('pt-BR')} às {dataEmissao.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+            </div>
           </div>
         </div>
 
-        {/* IDENTIFICAÇÃO DO DOCUMENTO */}
-        <div className="col-span-5 danfe-border rounded-lg flex flex-col justify-between text-center overflow-hidden">
-          <div className="bg-black text-[#FFD700] py-2 font-black uppercase text-[10px] tracking-widest">
-            Documento Auxiliar de Ordem de Serviço
+        {/* DIREITA: DADOS DA LOJA */}
+        <div style={{ textAlign: 'right', fontSize: '10px', color: '#374151', lineHeight: 1.6 }}>
+          <strong>ÓTICA LIS LTDA</strong><br />
+          CNPJ: 39.156.577/0001-22<br />
+          {endereco}, Nº 2134<br />
+          Vila Concórdia - Goiânia/GO<br />
+          Fone/WhatsApp: (62) 99285-8280
+        </div>
+      </div>
+
+      {/* =========================================== */}
+      {/* DADOS DO CLIENTE                           */}
+      {/* =========================================== */}
+      <div className="os-border" style={{ borderRadius: '8px', marginBottom: '16px', overflow: 'hidden' }}>
+        <div className="os-section-title">Identificação do Cliente</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', padding: '12px' }}>
+          <div>
+            <div className="os-label">Nome Completo</div>
+            <div className="os-value">{sale.cliente_nome || 'Cliente Consumidor'}</div>
           </div>
-          <div className="p-3 flex-1 flex flex-col justify-center">
-            <p className="text-[9px] text-gray-500 uppercase font-black">NÚMERO DA O.S.</p>
-            <p className="text-2xl font-black text-black">#{osNumberFormatted}</p>
-            <p className="text-[8px] text-gray-400 font-mono mt-1">EMISSÃO: {new Date(sale.criado_em || sale.data || Date.now()).toLocaleDateString('pt-BR')} {new Date(sale.criado_em || sale.data || Date.now()).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
+          <div>
+            <div className="os-label">CPF</div>
+            <div className="os-value" style={{ fontFamily: 'monospace' }}>{sale.cliente_cpf || sale.paciente_cpf || 'Não informado'}</div>
           </div>
-          <div className="bg-[#FFD700] text-black py-2 font-bold text-[9px] uppercase border-t border-black">
-            Via do Cliente & Laboratório
+          <div>
+            <div className="os-label">WhatsApp / Telefone</div>
+            <div className="os-value" style={{ fontFamily: 'monospace' }}>{sale.cliente_whatsapp || sale.paciente_whatsapp || 'Não informado'}</div>
           </div>
         </div>
       </div>
 
-      {/* DADOS DO CLIENTE */}
-      <div className="danfe-border rounded-lg p-3 mb-4">
-        <span className="danfe-title block mb-2 border-b pb-1 border-gray-200">Identificação do Destinatário / Cliente</span>
-        <div className="grid grid-cols-12 gap-2 text-[10px]">
-          <div className="col-span-6">
-            <p><span className="text-gray-500 font-medium">NOME / RAZÃO SOCIAL:</span></p>
-            <p className="font-bold text-black text-[11px]">{sale.cliente_nome || 'Cliente Consumidor'}</p>
-          </div>
-          <div className="col-span-3">
-            <p><span className="text-gray-500 font-medium">CPF / CNPJ:</span></p>
-            <p className="font-bold text-black font-mono">{sale.cliente_cpf || sale.paciente_cpf || '---.---.------'}</p>
-          </div>
-          <div className="col-span-3">
-            <p><span className="text-gray-500 font-medium">TELEFONE:</span></p>
-            <p className="font-bold text-black font-mono">{sale.cliente_whatsapp || sale.paciente_whatsapp || '(62) 99285-8280'}</p>
-          </div>
+      {/* =========================================== */}
+      {/* PRODUTOS E SERVIÇOS                        */}
+      {/* =========================================== */}
+      <div className="os-border" style={{ borderRadius: '8px', overflow: 'hidden', marginBottom: '16px' }}>
+        <div className="os-section-title">
+          Produtos Escolhidos
         </div>
-      </div>
-
-      {/* DADOS DOS PRODUTOS / LENTES */}
-      <div className="danfe-border rounded-lg overflow-hidden mb-4">
-        <div className="bg-black text-white p-2">
-          <span className="font-black text-[9px] uppercase tracking-wider">Produtos e Serviços da Ordem de Serviço</span>
-        </div>
-        <table className="w-full text-[10px] border-collapse">
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '9px' }}>
           <thead>
-            <tr className="bg-gray-100 border-b border-black text-left font-bold">
-              <th className="p-2 border-r border-gray-300">CÓDIGO</th>
-              <th className="p-2 border-r border-gray-300">DESCRIÇÃO DO PRODUTO / SERVIÇO</th>
-              <th className="p-2 border-r border-gray-300 text-center">NCM</th>
-              <th className="p-2 border-r border-gray-300 text-center">CFOP</th>
-              <th className="p-2 border-r border-gray-300 text-center">QTD</th>
-              <th className="p-2 border-r border-gray-300 text-right">VALOR UNIT.</th>
-              <th className="p-2 text-right">VALOR TOTAL</th>
+            <tr style={{ backgroundColor: '#fff', borderBottom: '1px solid #e5e7eb' }}>
+              <th style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 800, borderRight: '1px solid #d1d5db' }}>CÓD.</th>
+              <th style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 800, borderRight: '1px solid #d1d5db' }}>DESCRIÇÃO DO PRODUTO / SERVIÇO</th>
+              <th style={{ padding: '6px 8px', textAlign: 'center', fontWeight: 800, borderRight: '1px solid #d1d5db' }}>NCM</th>
+              <th style={{ padding: '6px 8px', textAlign: 'center', fontWeight: 800, borderRight: '1px solid #d1d5db' }}>CFOP</th>
+              <th style={{ padding: '6px 8px', textAlign: 'center', fontWeight: 800, borderRight: '1px solid #d1d5db' }}>QTD</th>
+              <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 800, borderRight: '1px solid #d1d5db' }}>VLR. UNIT.</th>
+              <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 800 }}>VLR. TOTAL</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
-            {/* Linha da Armação se existir */}
-            {sale.produto_nome && (
-              <tr>
-                <td className="p-2 border-r border-gray-300 font-mono text-[9px]">ARM-{sale.id?.slice(-4).toUpperCase() || '0021'}</td>
-                <td className="p-2 border-r border-gray-300 font-bold uppercase">Armação: {sale.produto_nome}</td>
-                <td className="p-2 border-r border-gray-300 text-center font-mono">9003.11.00</td>
-                <td className="p-2 border-r border-gray-300 text-center font-mono">5102</td>
-                <td className="p-2 border-r border-gray-300 text-center">1</td>
-                <td className="p-2 border-r border-gray-300 text-right">R$ {Number(sale.valor_base || sale.valor_total).toFixed(2)}</td>
-                <td className="p-2 text-right font-bold">R$ {Number(sale.valor_base || sale.valor_total).toFixed(2)}</td>
+          <tbody>
+            {sale.armacao_nome && (
+              <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+                <td style={{ padding: '6px 8px', fontFamily: 'monospace', fontSize: '8px', borderRight: '1px solid #e5e7eb' }}>ARM-{(sale.id || '').slice(-4).toUpperCase()}</td>
+                <td style={{ padding: '6px 8px', fontWeight: 700, textTransform: 'uppercase', borderRight: '1px solid #e5e7eb' }}>Armação: {sale.armacao_nome}</td>
+                <td style={{ padding: '6px 8px', textAlign: 'center', fontFamily: 'monospace', borderRight: '1px solid #e5e7eb' }}>9003.11.00</td>
+                <td style={{ padding: '6px 8px', textAlign: 'center', fontFamily: 'monospace', borderRight: '1px solid #e5e7eb' }}>5102</td>
+                <td style={{ padding: '6px 8px', textAlign: 'center', borderRight: '1px solid #e5e7eb' }}>1</td>
+                <td style={{ padding: '6px 8px', textAlign: 'right', borderRight: '1px solid #e5e7eb' }}>R$ {Number(sale.armacao_preco || 0).toFixed(2)}</td>
+                <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700 }}>R$ {Number(sale.armacao_preco || 0).toFixed(2)}</td>
               </tr>
             )}
-            {/* Linha das Lentes se existir */}
             {sale.tipo_lente && (
-              <tr>
-                <td className="p-2 border-r border-gray-300 font-mono text-[9px]">LNT-{sale.id?.slice(-4).toUpperCase() || '0022'}</td>
-                <td className="p-2 border-r border-gray-300 font-bold uppercase">
-                  Lentes: {sale.tipo_lente} {sale.tratamento && `• Tratamento: ${sale.tratamento}`}
+              <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+                <td style={{ padding: '6px 8px', fontFamily: 'monospace', fontSize: '8px', borderRight: '1px solid #e5e7eb' }}>LNT-{(sale.id || '').slice(-4).toUpperCase()}</td>
+                <td style={{ padding: '6px 8px', fontWeight: 700, textTransform: 'uppercase', borderRight: '1px solid #e5e7eb' }}>
+                  Lente: {sale.tipo_lente} {sale.tratamento ? `• ${sale.tratamento}` : ''}
                 </td>
-                <td className="p-2 border-r border-gray-300 text-center font-mono">9001.50.00</td>
-                <td className="p-2 border-r border-gray-300 text-center font-mono">5102</td>
-                <td className="p-2 border-r border-gray-300 text-center">1</td>
-                <td className="p-2 border-r border-gray-300 text-right">R$ {Number(sale.desconto > 0 ? (Number(sale.valor_total) - (sale.produto_nome ? Number(sale.valor_base) : 0)) : sale.valor_total).toFixed(2)}</td>
-                <td className="p-2 text-right font-bold">R$ {Number(sale.desconto > 0 ? (Number(sale.valor_total) - (sale.produto_nome ? Number(sale.valor_base) : 0)) : sale.valor_total).toFixed(2)}</td>
+                <td style={{ padding: '6px 8px', textAlign: 'center', fontFamily: 'monospace', borderRight: '1px solid #e5e7eb' }}>9001.50.00</td>
+                <td style={{ padding: '6px 8px', textAlign: 'center', fontFamily: 'monospace', borderRight: '1px solid #e5e7eb' }}>5102</td>
+                <td style={{ padding: '6px 8px', textAlign: 'center', borderRight: '1px solid #e5e7eb' }}>1</td>
+                <td style={{ padding: '6px 8px', textAlign: 'right', borderRight: '1px solid #e5e7eb' }}>R$ {Number(sale.lente_preco || sale.valor_base || sale.valor_total).toFixed(2)}</td>
+                <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700 }}>R$ {Number(sale.lente_preco || sale.valor_base || sale.valor_total).toFixed(2)}</td>
               </tr>
             )}
-            {/* Fallback caso não tenha nenhum dos dois detalhado */}
-            {!sale.produto_nome && !sale.tipo_lente && (
-              <tr>
-                <td className="p-2 border-r border-gray-300 font-mono text-[9px]">SERV-OS</td>
-                <td className="p-2 border-r border-gray-300 font-bold uppercase">Serviço Óptico / Venda Geral Ref. O.S. #{osNumberFormatted}</td>
-                <td className="p-2 border-r border-gray-300 text-center font-mono">9003.11.00</td>
-                <td className="p-2 border-r border-gray-300 text-center font-mono">5102</td>
-                <td className="p-2 border-r border-gray-300 text-center">1</td>
-                <td className="p-2 border-r border-gray-300 text-right">R$ {Number(sale.valor_total).toFixed(2)}</td>
-                <td className="p-2 text-right font-bold">R$ {Number(sale.valor_total).toFixed(2)}</td>
+            {!sale.armacao_nome && !sale.tipo_lente && (
+              <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+                <td style={{ padding: '6px 8px', fontFamily: 'monospace', fontSize: '8px', borderRight: '1px solid #e5e7eb' }}>SERV-OS</td>
+                <td style={{ padding: '6px 8px', fontWeight: 700, textTransform: 'uppercase', borderRight: '1px solid #e5e7eb' }}>Serviço Óptico / Venda Geral Ref. O.S. #{osNumberFormatted}</td>
+                <td style={{ padding: '6px 8px', textAlign: 'center', fontFamily: 'monospace', borderRight: '1px solid #e5e7eb' }}>9003.11.00</td>
+                <td style={{ padding: '6px 8px', textAlign: 'center', fontFamily: 'monospace', borderRight: '1px solid #e5e7eb' }}>5102</td>
+                <td style={{ padding: '6px 8px', textAlign: 'center', borderRight: '1px solid #e5e7eb' }}>1</td>
+                <td style={{ padding: '6px 8px', textAlign: 'right', borderRight: '1px solid #e5e7eb' }}>R$ {Number(sale.valor_total).toFixed(2)}</td>
+                <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700 }}>R$ {Number(sale.valor_total).toFixed(2)}</td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
 
-      {/* QUADRO DE RECEITA TÉCNICA */}
-      <div className="danfe-border rounded-lg overflow-hidden mb-4">
-        <div className="bg-[#FFD700] text-black p-2 border-b border-black font-black text-[9px] uppercase tracking-wider">
-          Dados Técnicos da Receita Óptica
+      {/* =========================================== */}
+      {/* RECEITA TÉCNICA                             */}
+      {/* =========================================== */}
+      <div className="os-border" style={{ borderRadius: '8px', overflow: 'hidden', marginBottom: '16px' }}>
+        <div className="os-section-title">
+          Dados Técnicos da Receita
         </div>
-        <table className="w-full text-[10px] text-center border-collapse">
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px', textAlign: 'center' }}>
           <thead>
-            <tr className="bg-gray-50 border-b border-gray-300 font-bold text-gray-700">
-              <th className="p-2 border-r border-gray-300">OLHO</th>
-              <th className="p-2 border-r border-gray-300">ESFÉRICO</th>
-              <th className="p-2 border-r border-gray-300">CILÍNDRICO</th>
-              <th className="p-2 border-r border-gray-300">EIXO</th>
-              <th className="p-2 border-r border-gray-300">DNP</th>
-              <th className="p-2">ADIÇÃO</th>
+            <tr style={{ backgroundColor: '#fafafa', borderBottom: '1px solid #d1d5db' }}>
+              <th style={{ padding: '8px', fontWeight: 800, fontSize: '8px', borderRight: '1px solid #d1d5db', color: '#555' }}>OLHO</th>
+              <th style={{ padding: '8px', fontWeight: 800, fontSize: '8px', borderRight: '1px solid #d1d5db', color: '#555' }}>ESFÉRICO</th>
+              <th style={{ padding: '8px', fontWeight: 800, fontSize: '8px', borderRight: '1px solid #d1d5db', color: '#555' }}>CILÍNDRICO</th>
+              <th style={{ padding: '8px', fontWeight: 800, fontSize: '8px', borderRight: '1px solid #d1d5db', color: '#555' }}>EIXO</th>
+              <th style={{ padding: '8px', fontWeight: 800, fontSize: '8px', borderRight: '1px solid #d1d5db', color: '#555' }}>DNP</th>
+              <th style={{ padding: '8px', fontWeight: 800, fontSize: '8px', color: '#555' }}>ADIÇÃO</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
-            <tr>
-              <td className="p-2 border-r border-gray-300 bg-gray-100 font-black text-black text-[9px]">OD (Olho Direito)</td>
-              <td className="p-2 border-r border-gray-300 font-bold font-mono">{sale.od_esferico ? (sale.od_esferico > 0 ? `+${Number(sale.od_esferico).toFixed(2)}` : Number(sale.od_esferico).toFixed(2)) : '0.00'}</td>
-              <td className="p-2 border-r border-gray-300 font-bold font-mono">{sale.od_cilindrico ? (sale.od_cilindrico > 0 ? `+${Number(sale.od_cilindrico).toFixed(2)}` : Number(sale.od_cilindrico).toFixed(2)) : '0.00'}</td>
-              <td className="p-2 border-r border-gray-300 font-mono">{sale.od_eixo || '0'}°</td>
-              <td className="p-2 border-r border-gray-300 font-mono">{sale.od_dnp || '--'} mm</td>
-              <td className="p-2 font-bold font-mono" rowSpan={2}>{sale.od_adicao || sale.adicao || '--'}</td>
+          <tbody>
+            <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+              <td style={{ padding: '8px', backgroundColor: '#f9fafb', fontWeight: 900, fontSize: '8px', borderRight: '1px solid #d1d5db', color: '#111' }}>OD (Direito)</td>
+              <td style={{ padding: '8px', fontWeight: 700, fontFamily: 'monospace', borderRight: '1px solid #e5e7eb' }}>{formatGrau(sale.od_esferico)}</td>
+              <td style={{ padding: '8px', fontWeight: 700, fontFamily: 'monospace', borderRight: '1px solid #e5e7eb' }}>{formatGrau(sale.od_cilindrico)}</td>
+              <td style={{ padding: '8px', fontFamily: 'monospace', borderRight: '1px solid #e5e7eb' }}>{sale.od_eixo || '0'}°</td>
+              <td style={{ padding: '8px', fontFamily: 'monospace', borderRight: '1px solid #e5e7eb' }}>{sale.od_dnp || '--'} mm</td>
+              <td style={{ padding: '8px', fontWeight: 700, fontFamily: 'monospace' }} rowSpan={2}>{sale.od_adicao || sale.adicao || '--'}</td>
             </tr>
             <tr>
-              <td className="p-2 border-r border-gray-300 bg-gray-100 font-black text-black text-[9px]">OE (Olho Esquerdo)</td>
-              <td className="p-2 border-r border-gray-300 font-bold font-mono">{sale.oe_esferico ? (sale.oe_esferico > 0 ? `+${Number(sale.oe_esferico).toFixed(2)}` : Number(sale.oe_esferico).toFixed(2)) : '0.00'}</td>
-              <td className="p-2 border-r border-gray-300 font-bold font-mono">{sale.oe_cilindrico ? (sale.oe_cilindrico > 0 ? `+${Number(sale.oe_cilindrico).toFixed(2)}` : Number(sale.oe_cilindrico).toFixed(2)) : '0.00'}</td>
-              <td className="p-2 border-r border-gray-300 font-mono">{sale.oe_eixo || '0'}°</td>
-              <td className="p-2 border-r border-gray-300 font-mono">{sale.oe_dnp || '--'} mm</td>
+              <td style={{ padding: '8px', backgroundColor: '#f9fafb', fontWeight: 900, fontSize: '8px', borderRight: '1px solid #d1d5db', color: '#111' }}>OE (Esquerdo)</td>
+              <td style={{ padding: '8px', fontWeight: 700, fontFamily: 'monospace', borderRight: '1px solid #e5e7eb' }}>{formatGrau(sale.oe_esferico)}</td>
+              <td style={{ padding: '8px', fontWeight: 700, fontFamily: 'monospace', borderRight: '1px solid #e5e7eb' }}>{formatGrau(sale.oe_cilindrico)}</td>
+              <td style={{ padding: '8px', fontFamily: 'monospace', borderRight: '1px solid #e5e7eb' }}>{sale.oe_eixo || '0'}°</td>
+              <td style={{ padding: '8px', fontFamily: 'monospace', borderRight: '1px solid #e5e7eb' }}>{sale.oe_dnp || '--'} mm</td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      {/* OBSERVAÇÕES E DADOS ADICIONAIS */}
-      <div className="grid grid-cols-12 gap-2 mb-4">
-        <div className="col-span-8 danfe-border rounded-lg p-3 flex flex-col justify-between">
-          <div>
-            <span className="danfe-title block border-b pb-1 border-gray-200 mb-1">Observações Técnicas / Laboratório</span>
-            <p className="text-[10px] text-gray-700 italic">
-              {sale.observacoes || 'Nenhum detalhe adicional de montagem registrado.'}
+      {/* =========================================== */}
+      {/* OBSERVAÇÕES + TOTAIS                       */}
+      {/* =========================================== */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 240px', gap: '16px', marginBottom: '16px' }}>
+        {/* Observações */}
+        <div className="os-border" style={{ borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <div className="os-section-title">Condições e Observações</div>
+          <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%' }}>
+            <p style={{ fontSize: '9px', color: '#4b5563', lineHeight: 1.6 }}>
+              A garantia das lentes é de 90 dias para erros de fabricação ou adaptação. Armações têm garantia de 1 ano. Mau uso ou quebra não estão cobertos.
             </p>
           </div>
-          <div className="mt-2 text-[8px] text-gray-400">
-            Técnico responsável: <span className="font-bold text-gray-700">{sale.tecnico || 'Balcão Ótica Lìs'}</span>
-          </div>
         </div>
-        
-        {/* TOTAIS E PAGAMENTO */}
-        <div className="col-span-4 danfe-border rounded-lg p-3 bg-gray-50 flex flex-col justify-between text-right">
-          <div>
-            <span className="danfe-title block border-b pb-1 border-gray-200 mb-1">Cálculo de Totais</span>
-            <div className="space-y-1 text-[10px]">
-              <div className="flex justify-between">
-                <span className="text-gray-500">VALOR BASE:</span>
-                <span className="font-bold">R$ {Number(sale.valor_base || sale.valor_total).toFixed(2)}</span>
+
+        {/* Totais */}
+        <div className="os-border" style={{ borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <div className="os-section-title" style={{ textAlign: 'right' }}>Total e Pagamento</div>
+          <div style={{ padding: '12px', textAlign: 'right', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%' }}>
+            <div style={{ fontSize: '9px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+                <span style={{ color: '#888' }}>VALOR BASE:</span>
+                <strong>R$ {Number(sale.valor_base || sale.valor_total).toFixed(2)}</strong>
               </div>
               {Number(sale.desconto) > 0 && (
-                <div className="flex justify-between text-red-600">
-                  <span className="text-red-500">DESCONTO:</span>
-                  <span className="font-bold">- R$ {Number(sale.desconto).toFixed(2)}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px', color: '#dc2626' }}>
+                  <span>DESCONTO:</span>
+                  <strong>- R$ {Number(sale.desconto).toFixed(2)}</strong>
                 </div>
               )}
               {sale.is_birthday_discount && (
-                <div className="flex justify-between text-green-600">
-                  <span className="text-green-500">DESCONTO ANIV (10%):</span>
-                  <span className="font-bold">Aplicado</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px', color: '#16a34a' }}>
+                  <span>DESC. ANIV. (10%):</span>
+                  <strong>Aplicado</strong>
                 </div>
               )}
-              <div className="flex justify-between text-[11px] pt-1 border-t">
-                <span className="font-bold text-gray-700">PAGO EM:</span>
-                <span className="font-mono font-bold uppercase text-black">{sale.forma_pagamento || 'Cartão'}</span>
-              </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '8px', borderTop: '1px solid #e5e7eb', fontSize: '10px', marginTop: '8px' }}>
+              <span style={{ fontWeight: 600, color: '#6b7280' }}>CONDIÇÃO:</span>
+              <strong style={{ textTransform: 'uppercase', color: '#111' }}>{sale.forma_pagamento || 'Não informada'}</strong>
             </div>
           </div>
-          <div className="mt-2 pt-2 border-t border-gray-300">
-            <span className="text-[8px] text-gray-500 font-bold block uppercase tracking-widest">TOTAL OS A PAGAR</span>
-            <span className="text-xl font-black text-black">R$ {Number(sale.valor_total || 0).toFixed(2)}</span>
+          <div style={{ padding: '12px', backgroundColor: '#f9fafb', borderTop: '1px solid #e5e7eb' }}>
+            <div style={{ fontSize: '8px', color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>VALOR TOTAL</div>
+            <div style={{ fontSize: '20px', fontWeight: 800, color: '#000' }}>R$ {Number(sale.valor_total || 0).toFixed(2)}</div>
           </div>
         </div>
       </div>
 
-      {/* TERMO DE GARANTIA E ASSINATURAS */}
-      <div className="danfe-border rounded-lg p-3 mb-4 bg-gray-50/50">
-        <span className="danfe-title block border-b pb-1 border-gray-200 mb-1">Termo de Garantia e Responsabilidade</span>
-        <p className="text-[8px] text-gray-500 leading-normal text-justify">
-          A Ótica Lìs assegura garantia de adaptação das lentes pelo período de 90 dias a contar da data de entrega, desde que constatada a incorreção da receita ou erro de fabricação. A garantia das armações cobre defeitos de fabricação pelo prazo de 1 ano. Não cobrimos riscos nas lentes ou danos por mau uso, quebras acidentais ou ajustes efetuados por terceiros.
-        </p>
-      </div>
-
-      {/* ASSINATURA CLIENTE */}
-      <div className="flex justify-between items-end pt-4 mt-6">
-        <div className="w-1/2 border-t border-black pt-2 text-center">
-          <p className="text-[8px] font-black uppercase text-gray-600">Assinatura do Cliente</p>
-          <p className="text-[7px] text-gray-400">Autorizo a execução das lentes conforme especificações acima</p>
+      {/* =========================================== */}
+      {/* ASSINATURAS                                */}
+      {/* =========================================== */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', paddingTop: '24px', marginTop: '24px' }}>
+        <div style={{ width: '45%', borderTop: '1px solid #d1d5db', paddingTop: '8px', textAlign: 'center' }}>
+          <div style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', color: '#374151' }}>Assinatura do Cliente</div>
+          <div style={{ fontSize: '8px', color: '#6b7280' }}>Autorizo a confecção conforme especificações</div>
         </div>
-        <div className="w-1/3 text-right text-[8px] text-gray-400 font-mono">
-          <p>Ótica Lìs ERP v4.0</p>
-          <p>Chave OS: {sale.id || 'N/A'}</p>
+        <div style={{ width: '45%', borderTop: '1px solid #d1d5db', paddingTop: '8px', textAlign: 'center' }}>
+          <div style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', color: '#374151' }}>Ótica Lìs</div>
+          <div style={{ fontSize: '8px', color: '#6b7280' }}>Responsável pela venda</div>
         </div>
       </div>
     </div>
