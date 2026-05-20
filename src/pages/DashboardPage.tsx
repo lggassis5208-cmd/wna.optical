@@ -77,31 +77,54 @@ export default function DashboardPage() {
 
       setStats({ vendasHoje, osAbertas, novosClientesMes: novosClientes, estoqueBaixo });
 
-      // 1.1 Aniversariantes do Dia
+      // 1.1 Aniversariantes do Mês (ordenado por dia)
       const mesHoje = hojeDate.getMonth() + 1;
       const diaHoje = hojeDate.getDate();
-      const niverHoje = allClients.filter((c: any) => {
-        if (!c.data_nascimento) return false;
-        const [, m, d] = c.data_nascimento.split('-');
-        return parseInt(m) === mesHoje && parseInt(d) === diaHoje;
-      });
-      setAniversariantes(niverHoje);
+      
+      const niverMes = allClients
+        .filter((c: any) => {
+          if (!c.data_nascimento) return false;
+          const [, m] = c.data_nascimento.split('-');
+          return parseInt(m) === mesHoje;
+        })
+        .map((c: any) => {
+          const [, , d] = c.data_nascimento.split('-');
+          return {
+            ...c,
+            dia: parseInt(d),
+            idade: hojeDate.getFullYear() - new Date(c.data_nascimento).getFullYear()
+          };
+        })
+        .sort((a: any, b: any) => a.dia - b.dia);
 
-      // 1.2 Clientes para Reativar (> 1 ano)
+      setAniversariantes(niverMes);
+
+      // 1.2 Clientes para Reativar (Alerta de Retorno: última compra há mais de 1 ano)
       const umAnoAtras = new Date();
       umAnoAtras.setFullYear(umAnoAtras.getFullYear() - 1);
       
-      const inativos = allClients.filter((c: any) => {
+      const inativos = allClients.map((c: any) => {
         const clientSales = allSales.filter((s: any) => s.cliente_id === c.id || s.paciente_cpf === c.cpf);
-        if (clientSales.length === 0) return false; // Nunca comprou ou dado incompleto
+        if (clientSales.length === 0) return { ...c, diasInativo: -1 }; // Sem compras
         
-        const ultimaVenda = clientSales.reduce((latest: Date, s: any) => {
+        const ultimaVendaDate = clientSales.reduce((latest: Date, s: any) => {
           const sd = new Date(s.criado_em);
           return sd > latest ? sd : latest;
         }, new Date(0));
+
+        const diffTime = Math.abs(hojeDate.getTime() - ultimaVendaDate.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         
-        return ultimaVenda < umAnoAtras;
-      }).slice(0, 5); // Mostra top 5
+        return {
+          ...c,
+          diasInativo: diffDays,
+          dataUltimaVenda: ultimaVendaDate
+        };
+      })
+      .filter((c: any) => c.diasInativo > 365) // mais de 1 ano
+      .sort((a: any, b: any) => b.diasInativo - a.diasInativo)
+      .slice(0, 5); // top 5 mais urgentes
+
       setReativar(inativos);
 
       // 2. Gráfico de Vendas (Últimos 6 meses)
@@ -232,93 +255,147 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Aniversariantes */}
-        {aniversariantes.length > 0 && (
-          <div className="bg-gradient-to-br from-primary/10 to-transparent p-8 rounded-3xl border border-primary/20 shadow-xl relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
-              <Sparkles size={120} />
-            </div>
-            <h3 className="text-xl font-black mb-4 flex items-center gap-2">
+        {/* Aniversariantes do Mês */}
+        <div className="bg-gradient-to-br from-primary/10 to-transparent p-8 rounded-3xl border border-primary/20 shadow-xl relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
+            <Sparkles size={120} />
+          </div>
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-xl font-black flex items-center gap-2">
               <Gift className="text-primary" />
-              Aniversariantes do Dia 🎂
+              Aniversariantes do Mês 🎂
             </h3>
-            <div className="space-y-4 relative z-10">
-              {aniversariantes.map((c: any) => (
-                <div key={c.id} className="flex items-center justify-between bg-white/5 p-4 rounded-2xl border border-white/5">
-                  <div>
-                    <p className="font-bold text-white">{c.name}</p>
-                    <p className="text-xs text-white/40">Fez {new Date().getFullYear() - new Date(c.data_nascimento).getFullYear()} anos hoje!</p>
-                  </div>
-                  <button 
-                    onClick={() => {
-                      if (!c.whatsapp) {
-                        toast.error('Número de Telefone não encontrado.');
-                        return;
-                      }
-                      openWhatsApp(
-                        c.whatsapp,
-                        `Parabéns pelo seu Aniversário! A Ótica Lìs gostaria de te presentear com um desconto especial, passe em nossa Ótica e confira agora!`
-                      );
-                    }}
-                    disabled={!c.whatsapp}
-                    title={!c.whatsapp ? 'Cadastre o Zap primeiro' : 'Enviar Presente'}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
-                      !c.whatsapp 
-                        ? 'bg-white/10 text-white/20 cursor-not-allowed' 
-                        : 'bg-primary text-black hover:scale-105'
+            <span className="px-3 py-1 bg-primary/20 text-primary border border-primary/30 rounded-xl text-[10px] font-black uppercase tracking-widest">
+              Mês {new Date().getMonth() + 1}
+            </span>
+          </div>
+          <div className="space-y-4 relative z-10 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
+            {aniversariantes.length > 0 ? (
+              aniversariantes.map((c: any) => {
+                const hojeDate = new Date();
+                const isHoje = c.dia === hojeDate.getDate();
+                
+                return (
+                  <div 
+                    key={c.id} 
+                    className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${
+                      isHoje 
+                        ? 'bg-primary/20 border-primary/40 shadow-[0_0_15px_rgba(255,215,0,0.15)] animate-pulse' 
+                        : 'bg-white/5 border-white/5 hover:border-white/10'
                     }`}
                   >
-                    <MessageSquare size={14} />
-                    {!c.whatsapp ? 'Cadastre o Zap primeiro' : 'Enviar Desconto'}
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Clientes para Reativar */}
-        {reativar.length > 0 && (
-          <div className="bg-surface p-8 rounded-3xl border border-white/5 shadow-xl">
-            <h3 className="text-xl font-black mb-4 flex items-center gap-2">
-              <UserX className="text-red-400" />
-              Clientes para Reativar
-            </h3>
-            <p className="text-xs text-white/30 mb-6 uppercase font-black tracking-widest">Inativos há mais de 1 ano</p>
-            <div className="space-y-4">
-              {reativar.map((c: any) => (
-                <div key={c.id} className="flex items-center justify-between group">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white/20 font-bold group-hover:bg-primary/10 group-hover:text-primary transition-colors">
-                      {c.name.charAt(0)}
-                    </div>
                     <div>
-                      <p className="font-bold text-sm text-white/80 group-hover:text-white transition-colors">{c.name}</p>
-                      <p className="text-[10px] text-white/20 uppercase font-black tracking-tighter">Última compra em {formatDate(sales.filter((s: any) => s.cliente_id === c.id || s.paciente_cpf === c.cpf).sort((a: any, b: any) => new Date(b.criado_em).getTime() - new Date(a.criado_em).getTime())[0]?.criado_em)}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-bold text-white text-sm">{c.name}</p>
+                        {isHoje && (
+                          <span className="px-2 py-0.5 rounded-full bg-primary text-black font-black text-[9px] uppercase animate-bounce">
+                            Hoje! 🎉
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-white/40 uppercase tracking-widest font-black mt-0.5">
+                        Dia {c.dia} • {c.idade} anos
+                      </p>
                     </div>
+                    <button 
+                      onClick={() => {
+                        if (!c.whatsapp) {
+                          toast.error('Número de Telefone não encontrado.');
+                          return;
+                        }
+                        openWhatsApp(
+                          c.whatsapp,
+                          `Olá, ${c.name}! A Ótica Lìs deseja a você um feliz aniversário repleto de saúde e conquistas! 🎂✨ E para comemorar, preparamos um presente especial para você: 10% de desconto exclusivo em qualquer armação ou lente durante este mês. Venha nos fazer uma visita! 👓🎁`
+                        );
+                      }}
+                      disabled={!c.whatsapp}
+                      title={!c.whatsapp ? 'Cadastre o Zap primeiro' : 'Enviar Presente'}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
+                        !c.whatsapp 
+                          ? 'bg-white/5 text-white/20 cursor-not-allowed' 
+                          : 'bg-primary text-black hover:scale-105 active:scale-95'
+                      }`}
+                    >
+                      <MessageSquare size={14} />
+                      {!c.whatsapp ? 'Sem Zap' : 'Enviar Desconto'}
+                    </button>
                   </div>
-                  <button 
-                    onClick={() => openWhatsApp(
-                      c.whatsapp,
-                      `Olá, ${c.name}, tudo bem? Sentimos sua falta aqui na Ótica Lis! 🤗 Faz tempo que você não vem nos visitar. Que tal passar aqui para fazer uma manutenção gratuita nos seus óculos e conferir as novidades? Aguardamos você!`
-                    )}
-                    className="p-2 bg-white/5 text-white/30 rounded-xl hover:bg-white/10 hover:text-white transition-all"
-                    title="Mandar convite"
-                  >
-                    <MessageSquare size={16} />
-                  </button>
-                </div>
-              ))}
-            </div>
+                );
+              })
+            ) : (
+              <div className="py-12 text-center text-white/10 italic text-sm">Nenhum cliente faz aniversário este mês.</div>
+            )}
           </div>
-        )}
+        </div>
+
+        {/* Clientes para Reativar (Alerta de Retorno) */}
+        <div className="bg-surface p-8 rounded-3xl border border-white/5 shadow-xl">
+          <div className="flex justify-between items-start mb-4">
+            <div>
+              <h3 className="text-xl font-black flex items-center gap-2">
+                <UserX className="text-red-400" />
+                Alerta de Retorno
+              </h3>
+              <p className="text-xs text-white/30 uppercase font-black tracking-widest mt-1">Última compra há mais de 1 ano</p>
+            </div>
+            <span className="px-3 py-1 bg-red-500/10 text-red-400 border border-red-500/20 rounded-xl text-[10px] font-black uppercase tracking-widest animate-pulse">
+              Reativação
+            </span>
+          </div>
+          <div className="space-y-4 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
+            {reativar.length > 0 ? (
+              reativar.map((c: any) => {
+                const meses = Math.floor(c.diasInativo / 30);
+                
+                return (
+                  <div key={c.id} className="flex items-center justify-between p-4 bg-white/[0.02] border border-white/5 rounded-2xl hover:border-white/10 transition-all group">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white/20 font-bold group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                        {c.name.charAt(0)}
+                      </div>
+                      <div>
+                        <p className="font-bold text-sm text-white/80 group-hover:text-white transition-colors">{c.name}</p>
+                        <p className="text-[10px] text-red-400/80 font-black uppercase tracking-widest mt-0.5">
+                          Inativo há {c.diasInativo} dias ({meses} meses)
+                        </p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => {
+                        if (!c.whatsapp) {
+                          toast.error('Número de Telefone não encontrado.');
+                          return;
+                        }
+                        openWhatsApp(
+                          c.whatsapp,
+                          `Olá, ${c.name}! Tudo bem? Sentimos sua falta aqui na Ótica Lìs! 🤗 Faz mais de 1 ano que você adquiriu seus últimos óculos conosco. A saúde dos seus olhos é muito importante! Que tal agendar um novo exame de vista gratuito para manutenção dos seus óculos e conferir os novos lançamentos? Aguardamos você! 👓✨`
+                        );
+                      }}
+                      disabled={!c.whatsapp}
+                      className={`p-2.5 rounded-xl transition-all ${
+                        !c.whatsapp 
+                          ? 'bg-white/5 text-white/10 cursor-not-allowed' 
+                          : 'bg-white/5 text-white/50 hover:bg-primary hover:text-black hover:scale-105'
+                      }`}
+                      title="Mandar convite de retorno"
+                    >
+                      <MessageSquare size={16} />
+                    </button>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="py-12 text-center text-white/10 italic text-sm">Nenhum cliente precisa de reativação no momento.</div>
+            )}
+          </div>
+        </div>
       </div>
 
       <section className="bg-surface rounded-3xl border border-white/5 overflow-hidden shadow-xl">
         <div className="p-6 border-b border-white/5 flex items-center justify-between bg-white/[0.01]">
           <div>
             <h3 className="text-lg font-bold">Últimas Ordens de Serviço</h3>
-            <p className="text-[10px] text-white/30 font-black uppercase tracking-widest mt-1">Processamento recente</p>
+            <p className="text-[10px] text-white/30 font-black uppercase tracking-widest mt-1">Processamento recente • Clique para ver detalhes</p>
           </div>
           <button 
             onClick={() => navigate('/vendas')}
@@ -331,21 +408,25 @@ export default function DashboardPage() {
         <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {sales.slice(-6).reverse().map((s: any) => {
             const treatmentColors: Record<string, string> = {
-              'Crizal': 'border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.2)]',
-              'Video Filter': 'border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.2)]',
-              'Sapphire': 'border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.2)]',
-              'Easy': 'border-slate-400 shadow-[0_0_15px_rgba(148,163,184,0.2)]',
+              'Crizal': 'border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.05)]',
+              'Video Filter': 'border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.05)]',
+              'Sapphire': 'border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.05)]',
+              'Easy': 'border-slate-400 shadow-[0_0_15px_rgba(148,163,184,0.05)]',
             };
             const borderColor = treatmentColors[s.tratamento] || 'border-white/10';
 
             return (
-              <div key={s.id} className={`bg-white/[0.02] p-5 rounded-2xl border-2 ${borderColor} transition-all hover:scale-[1.02] flex flex-col justify-between group`}>
+              <div 
+                key={s.id} 
+                onClick={() => navigate(`/vendas?search=${s.os_number || s.id}`)}
+                className={`bg-white/[0.02] p-5 rounded-2xl border-2 ${borderColor} transition-all hover:scale-[1.02] hover:bg-white/[0.04] cursor-pointer flex flex-col justify-between group shadow-lg`}
+              >
                 <div>
                   <div className="flex justify-between items-start mb-3">
-                    <span className="font-mono text-[10px] font-black text-primary uppercase tracking-tighter">{s.os_number || 'S/N'}</span>
+                    <span className="font-mono text-[10px] font-black text-primary uppercase tracking-tighter">#{s.os_number || (s.id?.slice(-6) || 'S/N').toUpperCase()}</span>
                     <StatusBadge status={s.status || 'ABERTA'} />
                   </div>
-                  <h4 className="font-bold text-white group-hover:text-primary transition-colors">{s.tecnico || 'Cliente Final'}</h4>
+                  <h4 className="font-bold text-white group-hover:text-primary transition-colors text-sm truncate">{s.cliente_nome || s.tecnico || 'Cliente Final'}</h4>
                   <p className="text-[10px] text-white/40 uppercase font-black tracking-widest mt-1">
                     {s.tipo_lente || 'LENTE'} {s.tratamento ? `+ ${s.tratamento}` : ''}
                   </p>

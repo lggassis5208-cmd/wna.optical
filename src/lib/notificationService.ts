@@ -115,19 +115,22 @@ export const notificationService = {
       }
     });
 
-    // 4. Verificar Estoque Baixo
+    // 4. Verificar Estoque Baixo (usa stock_minimo real de cada produto)
     const products = await storage.getProducts();
     products.forEach((prod: any) => {
       const stock = Number(prod.estoque) || 0;
-      const min = Number(prod.stock_minimo) || 0;
+      const min = Number(prod.stock_minimo) || 5; // fallback padrão de 5
       
       if (stock <= min) {
+        const isZero = stock === 0;
         notifications.push({
           id: `stock-${prod.id}`,
-          title: 'Estoque Baixo',
-          message: `${prod.nome} está com apenas ${stock} unidades.`,
+          title: isZero ? '🚨 Produto Esgotado!' : '⚠️ Estoque Baixo',
+          message: isZero 
+            ? `${prod.nome} está ZERADO. Faça o pedido urgente!`
+            : `${prod.nome} está com apenas ${stock} un. (mínimo: ${min}).`,
           type: 'STOCK',
-          severity: stock === 0 ? 'high' : 'medium',
+          severity: isZero ? 'high' : 'medium',
           timestamp: new Date().toISOString(),
           read: false,
           actionParam: prod.id

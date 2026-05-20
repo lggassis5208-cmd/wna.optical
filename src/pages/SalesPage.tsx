@@ -10,17 +10,23 @@ import {
   MoreVertical,
   FileText,
   Printer,
-  MessageSquare
+  MessageSquare,
+  Send,
+  Download,
+  ExternalLink
 } from 'lucide-react';
 import { toast } from 'sonner';
 import SaleModal from '../components/SaleModal';
 import PrintOS from '../components/PrintOS';
+import NotaAvulsaModal from '../components/NotaAvulsaModal';
 import { storage } from '../lib/storage';
 import { formatDate } from '../lib/dateUtils';
 import { openWhatsApp } from '../lib/whatsappUtils';
+import { SefazService } from '../lib/sefazService';
 
 export default function SalesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isAvulsaOpen, setIsAvulsaOpen] = useState(false);
   const [sales, setSales] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [settings, setSettings] = useState<any>(null);
@@ -49,11 +55,18 @@ export default function SalesPage() {
 
   useEffect(() => {
     fetchSales();
+    const params = new URLSearchParams(window.location.search);
+    const searchVal = params.get('search');
+    if (searchVal) {
+      setSearchTerm(searchVal);
+    }
   }, [isModalOpen]);
 
   const filteredSales = sales.filter(s => 
     s.os_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.tecnico?.toLowerCase().includes(searchTerm.toLowerCase())
+    s.cliente_nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    s.tecnico?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    s.id?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handlePrint = (sale: any) => {
@@ -70,13 +83,22 @@ export default function SalesPage() {
           <h2 className="text-2xl font-bold">Vendas & O.S.</h2>
           <p className="text-white/40 text-sm">Controle suas ordens de serviço e faturamento</p>
         </div>
-        <button 
-          onClick={() => setIsModalOpen(true)}
-          className="bg-primary text-black font-bold px-6 py-2.5 rounded-xl flex items-center gap-2 hover:shadow-lg hover:shadow-primary/20 transition-all active:scale-95"
-        >
-          <Plus size={20} />
-          Nova Venda / O.S.
-        </button>
+        <div className="flex gap-3">
+          <button 
+            onClick={() => setIsAvulsaOpen(true)}
+            className="bg-surface border border-primary text-primary font-bold px-6 py-2.5 rounded-xl flex items-center gap-2 hover:bg-primary/10 transition-all active:scale-95 text-sm"
+          >
+            <Send size={18} />
+            Emitir Nota Avulsa
+          </button>
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="bg-primary text-black font-bold px-6 py-2.5 rounded-xl flex items-center gap-2 hover:shadow-lg hover:shadow-primary/20 transition-all active:scale-95 text-sm"
+          >
+            <Plus size={20} />
+            Nova Venda / O.S.
+          </button>
+        </div>
       </div>
 
       {/* Status Summary */}
@@ -88,6 +110,7 @@ export default function SalesPage() {
       </div>
 
       <SaleModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      <NotaAvulsaModal isOpen={isAvulsaOpen} onClose={() => setIsAvulsaOpen(false)} />
       
       {activeSale && settings && (
         <PrintOS sale={activeSale} settings={settings} />
@@ -195,27 +218,104 @@ export default function SalesPage() {
                           <CheckCircle size={18} />
                         </button>
                       )}
-                      {(sale.status === 'PRONTA' || sale.status === 'ENTREGUE' || sale.status === 'CONCLUIDO' || sale.status === 'FINALIZADO') && (
-                        <button 
-                          onClick={async () => {
-                            try {
-                              await storage.gerarNotaDeVenda(sale.id);
-                              toast.success('Nota Fiscal Gerada!', {
-                                description: `A NF para o cliente ${sale.cliente_nome} já está disponível no módulo Fiscal.`,
-                                action: {
-                                  label: 'Ver Notas',
-                                  onClick: () => window.location.href = '/fiscal'
+                      {(sale.status === 'PRONTA' || sale.status === 'ENTREGUE' || sale.status === 'CONCLUIDO' || sale.status === 'FINALIZADO' || sale.status === 'MONTAGEM') && (
+                        !sale.faturada ? (
+                          <button 
+                            onClick={async () => {
+                              const loadingId = toast.loading('Processando faturamento junto à SEFAZ...');
+                              try {
+                                const result = await SefazService.emitirNotaFiscal(sale);
+                                if (result.sucesso) {
+                                  // Salva a nota no storage
+                                  const notaFaturamento = {
+                                    id: 'nf_' + Math.random().toString(36).substr(2, 9),
+                                    cliente: sale.cliente_nome,
+                                    cliente_doc: sale.paciente_cpf || '',
+                                    valor_total: Number(sale.valor_total || 0),
+                                    itens: sale.items || [{
+                                      produto_nome: `O.S. ${sale.os_number} - Lente ${sale.tipo_lente}`,
+                                      quantidade: 1,
+                                      valor_unitario: Number(sale.valor_total || 0),
+                                      ncm: '90031100'
+                                    }],
+                                    venda_id: sale.id,
+                                    status: 'AUTORIZADA',
+                                    natureza: 'Venda de Mercadoria',
+                                    cfop: '5102',
+                                    chave_acesso: result.chave_acesso,
+                                    danfe_url: result.danfe_url,
+                                    protocolo: result.protocolo,
+                                    xml: result.xml
+                                  };
+
+                                  // Atualiza os dados fiscais na venda e registra nota fiscal
+                                  await storage.atualizarVendaFiscal(sale.id, result.chave_acesso || '', result.danfe_url || '');
+                                  try {
+                                    await storage.registrarNotaFiscal(notaFaturamento);
+                                  } catch (e) {
+                                    console.warn('Nota salva na venda mas caixa não estava aberto:', e);
+                                  }
+
+                                  toast.dismiss(loadingId);
+                                  toast.success('Nota Fiscal emitida com sucesso!', {
+                                    description: `Chave de Acesso vinculada à O.S.`,
+                                  });
+
+                                  // Abre a DANFE em nova aba
+                                  if (result.danfe_url) {
+                                    window.open(result.danfe_url, '_blank');
+                                  }
+
+                                  fetchSales();
+                                } else {
+                                  toast.dismiss(loadingId);
+                                  toast.error(`Rejeição SEFAZ: ${result.motivo_rejeicao || 'Erro de validação.'}`);
                                 }
-                              });
-                            } catch (e: any) {
-                              toast.error('Erro ao gerar NF', { description: e.message });
-                            }
-                          }}
-                          className="p-2 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg transition-all border border-primary/20"
-                          title="Gerar Nota Fiscal"
-                        >
-                          <FileText size={18} />
-                        </button>
+                              } catch (e: any) {
+                                toast.dismiss(loadingId);
+                                toast.error('Erro de conexão com a SEFAZ.', { description: e.message });
+                              }
+                            }}
+                            className="p-2 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg transition-all border border-primary/20"
+                            title="Emitir Nota Fiscal Oficial"
+                          >
+                            <FileText size={18} />
+                          </button>
+                        ) : (
+                          <>
+                            {sale.danfe_url && (
+                              <a 
+                                href={sale.danfe_url} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="p-2 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg transition-all border border-primary/20 flex items-center justify-center text-primary"
+                                title="Visualizar DANFE Oficial (PDF)"
+                              >
+                                <ExternalLink size={18} />
+                              </a>
+                            )}
+                            {sale.chave_acesso && (
+                              <button 
+                                onClick={async () => {
+                                  const notas = await storage.getNotasFiscais();
+                                  const nota = notas.find((n: any) => n.venda_id === sale.id || n.chave_acesso === sale.chave_acesso);
+                                  if (nota && nota.xml) {
+                                    SefazService.baixarXML(sale.chave_acesso, nota.xml);
+                                    toast.success('XML baixado com sucesso!');
+                                  } else {
+                                    const mockXml = `<?xml version="1.0" encoding="UTF-8"?><nfeProc xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00"><NFe><infNFe Id="NFe${sale.chave_acesso}" versao="4.00"></infNFe></NFe><protNFe versao="4.00"><infProt><chNFe>${sale.chave_acesso}</chNFe><cStat>100</cStat></infProt></protNFe></nfeProc>`;
+                                    SefazService.baixarXML(sale.chave_acesso, mockXml);
+                                    toast.success('XML gerado e baixado!');
+                                  }
+                                }}
+                                className="p-2 bg-green-500/10 text-green-500 hover:bg-green-500/20 rounded-lg transition-all border border-green-500/20"
+                                title="Baixar XML Autorizado"
+                              >
+                                <Download size={18} />
+                              </button>
+                            )}
+                          </>
+                        )
                       )}
                       <button 
                         onClick={() => handlePrint(sale)}

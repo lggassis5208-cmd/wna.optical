@@ -46,7 +46,7 @@ export default function InventoryPage() {
   const stats = {
     totalItens: products.reduce((acc, p) => acc + Number(p.estoque || 0), 0),
     valorTotal: products.reduce((acc, p) => acc + (Number(p.estoque || 0) * Number(p.preco_venda || 0)), 0),
-    itensBaixo: products.filter(p => Number(p.estoque || 0) < 5).length
+    itensBaixo: products.filter(p => Number(p.estoque || 0) <= Number(p.stock_minimo || 5)).length
   };
 
   return (
@@ -81,9 +81,9 @@ export default function InventoryPage() {
         />
         <StatCard 
           icon={<AlertTriangle className="text-amber-400" />} 
-          label="Estoque Baixo" 
+          label="Estoque Crítico / Baixo" 
           value={stats.itensBaixo} 
-          subtext="Produtos com menos de 5 un."
+          subtext="Abaixo do limite mínimo definido"
           highlight={stats.itensBaixo > 0}
         />
       </div>
@@ -117,14 +117,16 @@ export default function InventoryPage() {
                 <th className="px-6 py-4">Unidade</th>
                 <th className="px-6 py-4 text-right">Preço</th>
                 <th className="px-6 py-4 text-center">Qtd Atual</th>
+                <th className="px-6 py-4 text-center">Estoque Mín.</th>
                 <th className="px-6 py-4"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
               {filteredProducts.map((p) => {
                 const isZero = Number(p.estoque || 0) === 0;
-                const isLow = Number(p.estoque || 0) < Number(p.stock_minimo || 5);
-                const rowClass = isZero ? 'bg-red-500/10' : (isLow ? 'bg-yellow-500/5' : '');
+                const minVal = Number(p.stock_minimo || 5);
+                const isLow = Number(p.estoque || 0) <= minVal;
+                const rowClass = isZero ? 'bg-red-500/10' : (isLow ? 'bg-amber-500/5 animate-pulse' : '');
 
                 return (
                   <tr key={p.id} className={`${rowClass} hover:bg-white/[0.04] transition-colors group border-b border-white/5`}>
@@ -160,10 +162,15 @@ export default function InventoryPage() {
                         ${isZero 
                           ? 'bg-red-500 text-white border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.3)]' 
                           : (isLow 
-                              ? 'bg-yellow-500/20 text-yellow-500 border-yellow-500/30' 
+                              ? 'bg-amber-500/20 text-amber-500 border-amber-500/30' 
                               : 'bg-green-500/10 text-green-400 border-green-500/20')}
                       `}>
                         {p.estoque} {p.unidade?.toLowerCase() || 'par'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-center text-sm font-bold text-white/60">
+                      <span className="px-2 py-1 rounded bg-white/5 font-mono">
+                        {minVal}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">

@@ -25,7 +25,8 @@ export default function ProductModal({ isOpen, onClose, product }: ProductModalP
     icms: '0.00',
     pis: '0.00',
     cofins: '0.00',
-    estoque: '0'
+    estoque: '0',
+    stock_minimo: '5'
   });
 
   useEffect(() => {
@@ -34,7 +35,8 @@ export default function ProductModal({ isOpen, onClose, product }: ProductModalP
         ...product,
         preco_custo: String(product.preco_custo || ''),
         preco_venda: String(product.preco_venda || ''),
-        estoque: String(product.estoque || '0')
+        estoque: String(product.estoque || '0'),
+        stock_minimo: String(product.stock_minimo || '5')
       });
     } else {
       setFormData({
@@ -51,7 +53,8 @@ export default function ProductModal({ isOpen, onClose, product }: ProductModalP
         icms: '0.00',
         pis: '0.00',
         cofins: '0.00',
-        estoque: '0'
+        estoque: '0',
+        stock_minimo: '5'
       });
     }
   }, [product, isOpen]);
@@ -83,7 +86,8 @@ export default function ProductModal({ isOpen, onClose, product }: ProductModalP
         ...formData,
         preco_custo: Number(formData.preco_custo),
         preco_venda: Number(formData.preco_venda),
-        estoque: Number(formData.estoque)
+        estoque: Number(formData.estoque),
+        stock_minimo: Number(formData.stock_minimo || 5)
       });
       toast.success(product ? 'Produto atualizado!' : 'Produto cadastrado com sucesso!');
       onClose();
@@ -135,12 +139,26 @@ export default function ProductModal({ isOpen, onClose, product }: ProductModalP
                 options={[
                   { value: 'UN', label: 'Unidade (UN)' },
                   { value: 'PAR', label: 'Par (PAR)' },
-                  { value: 'PC', label: 'Peça (PC)' },
+                  { value: 'PC', label: 'Peda (PC)' },
                 ]}
               />
               <Input label="Preço Custo (R$)" type="number" step="0.01" value={formData.preco_custo} onChange={(v: string) => setFormData({...formData, preco_custo: v})} placeholder="0.00" />
               <Input label="Preço Venda (R$)" type="number" step="0.01" value={formData.preco_venda} onChange={(v: string) => setFormData({...formData, preco_venda: v})} placeholder="0.00" />
               <Input label="Estoque Inicial" type="number" value={formData.estoque} onChange={(v: string) => setFormData({...formData, estoque: v})} placeholder="0" />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-amber-400 uppercase tracking-widest ml-1">🔔 Estoque Mínimo (Alerta)</label>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="Ex: 5"
+                  value={formData.stock_minimo}
+                  onChange={(e) => setFormData({...formData, stock_minimo: e.target.value})}
+                  className="w-full bg-amber-500/5 border border-amber-500/30 rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-amber-500/60 transition-colors text-white font-medium shadow-inner"
+                />
+                <p className="text-[10px] text-white/20 italic ml-1">Ao atingir esse limite, uma notificação aparecerá no sistema automaticamente.</p>
+              </div>
             </div>
           </section>
 

@@ -433,6 +433,19 @@ export const storage = {
     return null;
   },
 
+  async atualizarVendaFiscal(saleId: string, chaveAcesso: string, danfeUrl: string) {
+    const sales = await this.getSales();
+    const index = sales.findIndex((s: any) => s.id === saleId);
+    if (index !== -1) {
+      sales[index].chave_acesso = chaveAcesso;
+      sales[index].danfe_url = danfeUrl;
+      sales[index].faturada = true;
+      localStorage.setItem('lis_vendas', JSON.stringify(sales));
+      return sales[index];
+    }
+    return null;
+  },
+
   async registrarNotaFiscal(nota: any) {
     const caixa = await this.getCaixaAtual();
     if (!caixa) throw new Error('É necessário abrir o caixa antes de emitir uma nota fiscal.');
@@ -528,7 +541,9 @@ export const storage = {
       },
       fiscal: {
         serie: '1',
-        ambiente: 'homologacao'
+        ambiente: 'homologacao',
+        token_focus_nfe: '',
+        empresa_referencia: ''
       },
       certificado: {
         arquivo_nome: '',
@@ -547,7 +562,18 @@ export const storage = {
       }
     };
     const settings = JSON.parse(localStorage.getItem('lis_settings') || 'null');
-    return settings || defaults;
+    if (!settings) return defaults;
+    
+    // Merge seguro para garantir novos campos de faturamento
+    return {
+      ...defaults,
+      ...settings,
+      empresa: { ...defaults.empresa, ...settings.empresa },
+      fiscal: { ...defaults.fiscal, ...settings.fiscal },
+      certificado: { ...defaults.certificado, ...settings.certificado },
+      sistema: { ...defaults.sistema, ...settings.sistema },
+      sicoob: { ...defaults.sicoob, ...settings.sicoob }
+    };
   },
 
   async saveSettings(settings: any) {

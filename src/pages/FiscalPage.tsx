@@ -7,10 +7,13 @@ import {
   CheckCircle2, 
   Clock,
   Filter,
-  Plus
+  Plus,
+  Download,
+  ExternalLink
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { storage } from '../lib/storage';
+import { SefazService } from '../lib/sefazService';
 
 export default function FiscalPage() {
   const [notas, setNotas] = useState<any[]>([]);
@@ -124,6 +127,26 @@ export default function FiscalPage() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {n.danfe_url && (
+                        <a 
+                          href={n.danfe_url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="p-2 bg-white/5 hover:bg-primary/20 hover:text-primary rounded-lg transition-all text-white/50"
+                          title="Visualizar DANFE Oficial"
+                        >
+                          <ExternalLink size={18} />
+                        </a>
+                      )}
+                      {n.xml && (
+                        <button 
+                          onClick={() => SefazService.baixarXML(n.chave_acesso || n.id, n.xml)}
+                          className="p-2 bg-white/5 hover:bg-green-500/20 hover:text-green-400 rounded-lg transition-all"
+                          title="Baixar XML Autorizado"
+                        >
+                          <Download size={18} />
+                        </button>
+                      )}
                       <button 
                         onClick={() => openNota(n)}
                         className="p-2 bg-white/5 hover:bg-primary/20 hover:text-primary rounded-lg transition-all"
@@ -247,13 +270,37 @@ export default function FiscalPage() {
               >
                 Fechar Visualização
               </button>
-              <button 
-                onClick={() => window.print()}
-                className="px-8 py-3 bg-[#FFD700] text-black font-black rounded-xl shadow-lg shadow-[#FFD700]/20 hover:scale-[1.02] transition-all flex items-center gap-2 border border-black/10"
-              >
-                <Printer size={18} />
-                Confirmar Impressão
-              </button>
+              <div className="flex items-center gap-3">
+                {selectedNota.xml && (
+                  <button 
+                    onClick={() => SefazService.baixarXML(selectedNota.chave_acesso || selectedNota.id, selectedNota.xml)}
+                    className="px-4 py-2 bg-green-500/10 hover:bg-green-500/20 text-green-600 rounded-xl text-sm font-bold border border-green-500/20 transition-all flex items-center gap-2"
+                    title="Baixar XML"
+                  >
+                    <Download size={16} />
+                    Baixar XML
+                  </button>
+                )}
+                {selectedNota.danfe_url && (
+                  <a 
+                    href={selectedNota.danfe_url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="px-4 py-2 bg-primary/10 hover:bg-primary/20 text-primary rounded-xl text-sm font-bold border border-primary/20 transition-all flex items-center gap-2"
+                    title="Visualizar DANFE"
+                  >
+                    <ExternalLink size={16} />
+                    DANFE Oficial
+                  </a>
+                )}
+                <button 
+                  onClick={() => window.print()}
+                  className="px-8 py-3 bg-[#FFD700] text-black font-black rounded-xl shadow-lg shadow-[#FFD700]/20 hover:scale-[1.02] transition-all flex items-center gap-2 border border-black/10"
+                >
+                  <Printer size={18} />
+                  Confirmar Impressão
+                </button>
+              </div>
             </div>
           </div>
         </div>

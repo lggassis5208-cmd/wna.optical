@@ -108,30 +108,54 @@ export default function SettingsPage() {
            )}
 
            {activeTab === 'fiscal' && (
-             <section className="bg-surface rounded-3xl border border-white/5 p-8 space-y-6 animate-in slide-in-from-left-4 duration-300">
-                <div className="flex items-center gap-3 border-b border-white/5 pb-4 mb-4">
-                   <ShieldCheck className="text-primary" size={24} />
-                   <h3 className="text-xl font-bold text-white">Configurações Fiscais</h3>
-                </div>
-                <div className="grid grid-cols-2 gap-6">
-                   <ConfigInput 
-                    label="Série da Nota Fiscal" 
-                    value={settings.fiscal.serie} 
-                    onChange={(v) => setSettings({...settings, fiscal: {...settings.fiscal, serie: v}})}
-                   />
-                   <div className="space-y-2">
-                      <label className="text-[10px] font-black text-white/30 uppercase tracking-widest ml-1">Ambiente de Transmissão</label>
-                      <select 
-                        className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-primary/50 text-white"
-                        value={settings.fiscal.ambiente}
-                        onChange={(e) => setSettings({...settings, fiscal: {...settings.fiscal, ambiente: e.target.value}})}
-                      >
-                        <option value="homologacao">Homologação (Testes)</option>
-                        <option value="producao">Produção (Real)</option>
-                      </select>
-                   </div>
-                </div>
-             </section>
+              <section className="bg-surface rounded-3xl border border-white/5 p-8 space-y-6 animate-in slide-in-from-left-4 duration-300">
+                 <div className="flex items-center gap-3 border-b border-white/5 pb-4 mb-4">
+                    <ShieldCheck className="text-primary" size={24} />
+                    <h3 className="text-xl font-bold text-white">Configurações Fiscais</h3>
+                 </div>
+                 <div className="grid grid-cols-2 gap-6">
+                    <ConfigInput 
+                     label="Série da Nota Fiscal" 
+                     value={settings.fiscal.serie} 
+                     onChange={(v) => setSettings({...settings, fiscal: {...settings.fiscal, serie: v}})}
+                    />
+                    <div className="space-y-2">
+                       <label className="text-[10px] font-black text-white/30 uppercase tracking-widest ml-1">Ambiente de Transmissão</label>
+                       <select 
+                         className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-primary/50 text-white"
+                         value={settings.fiscal.ambiente}
+                         onChange={(e) => setSettings({...settings, fiscal: {...settings.fiscal, ambiente: e.target.value}})}
+                       >
+                         <option value="homologacao">Homologação (Testes)</option>
+                         <option value="producao">Produção (Real)</option>
+                       </select>
+                    </div>
+                 </div>
+                 
+                 <div className="h-px bg-white/5 my-4" />
+                 
+                 <div className="space-y-4">
+                    <h4 className="text-xs font-black uppercase tracking-widest text-primary">Integração API de Faturamento (Focus NFe)</h4>
+                    <p className="text-xs text-white/40 leading-relaxed italic">
+                      Insira o seu Token da API fornecido pela Focus NFe para habilitar a transmissão de notas fiscais reais. Se deixado em branco, o sistema executará em modo de simulação/homologação local de alta fidelidade.
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                       <ConfigInput 
+                        label="Token da API (Focus NFe)" 
+                        type="password"
+                        placeholder="Insira o Token de Autenticação"
+                        value={settings.fiscal.token_focus_nfe || ''} 
+                        onChange={(v) => setSettings({...settings, fiscal: {...settings.fiscal, token_focus_nfe: v}})}
+                       />
+                       <ConfigInput 
+                        label="Referência / ID da Empresa" 
+                        placeholder="Ex: ref_empresa_123"
+                        value={settings.fiscal.empresa_referencia || ''} 
+                        onChange={(v) => setSettings({...settings, fiscal: {...settings.fiscal, empresa_referencia: v}})}
+                       />
+                    </div>
+                 </div>
+              </section>
            )}
 
            {activeTab === 'certificado' && (

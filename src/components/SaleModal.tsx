@@ -12,12 +12,16 @@ import {
   Printer,
   CheckCircle2,
   MessageSquare,
-  Gift
+  Gift,
+  ExternalLink,
+  Send,
+  Download
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { storage } from '../lib/storage';
 import { getNowISO } from '../lib/dateUtils';
 import { openWhatsApp } from '../lib/whatsappUtils';
+import { SefazService } from '../lib/sefazService';
 import PrintOS from './PrintOS';
 
 interface SaleModalProps {
@@ -34,6 +38,51 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
   const [savedSale, setSavedSale] = useState<any>(null);
   const [isSuccess, setIsSuccess] = useState(false);
   const [client, setClient] = useState<any>(null);
+
+  const [sefazLoading, setSefazLoading] = useState(false);
+  const [sefazSuccess, setSefazSuccess] = useState(false);
+  const [sefazError, setSefazError] = useState('');
+  const [danfeUrl, setDanfeUrl] = useState('');
+  const [notaInfo, setNotaInfo] = useState<{ xml: string, chave: string } | null>(null);
+
+  const handleEmitirNfe = async (sale: any) => {
+    if (!sale) return;
+    setSefazLoading(true);
+    setSefazError('');
+    try {
+      const result = await SefazService.emitirNotaFiscal(sale);
+      if (result.sucesso) {
+        setSefazSuccess(true);
+        setDanfeUrl(result.danfe_url || '');
+        setNotaInfo({
+          xml: result.xml || '',
+          chave: result.chave_acesso || ''
+        });
+        
+        // Salva a chave de acesso de 44 dígitos no histórico da venda
+        if (sale.id && result.chave_acesso) {
+          await storage.atualizarVendaFiscal(sale.id, result.chave_acesso, result.danfe_url || '');
+        }
+
+        // Abre automaticamente em uma nova aba o PDF do DANFE oficial gerado pela API/governo
+        if (result.danfe_url) {
+          window.open(result.danfe_url, '_blank');
+        }
+
+        toast.success('Nota Fiscal emitida com sucesso!', {
+          description: `Chave de Acesso vinculada à venda.`
+        });
+      } else {
+        setSefazError(result.motivo_rejeicao || 'Erro desconhecido junto à SEFAZ.');
+        toast.error(`Falha na emissão: ${result.motivo_rejeicao}`);
+      }
+    } catch (e: any) {
+      setSefazError(e.message || 'Erro de conexão.');
+      toast.error('Erro ao emitir nota fiscal.');
+    } finally {
+      setSefazLoading(false);
+    }
+  };
   
   const initialState = {
     cliente_id: '',
@@ -155,6 +204,11 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
     setStep(1);
     setIsSuccess(false);
     setSavedSale(null);
+    setSefazLoading(false);
+    setSefazSuccess(false);
+    setSefazError('');
+    setDanfeUrl('');
+    setNotaInfo(null);
     onClose();
   };
 
@@ -391,6 +445,77 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
                 </button>
               </div>
 
+              {/* Módulo de Faturamento SEFAZ */}
+              <div className="w-full max-w-md bg-white/[0.02] border border-white/5 rounded-3xl p-6 mt-8 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">Faturamento Fiscal</span>
+                  <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${
+                    sefazSuccess ? 'bg-green-500/10 text-green-500' : sefazLoading ? 'bg-yellow-500/10 text-yellow-500' : 'bg-white/5 text-white/40'
+                  }`}>
+                    {sefazSuccess ? 'Autorizada' : sefazLoading ? 'Processando' : 'Pendente'}
+                  </span>
+                </div>
+
+                {!sefazSuccess && !sefazLoading && (
+                  <div className="space-y-4">
+                    <p className="text-xs text-white/40 leading-relaxed italic">
+                      Deseja gerar e enviar a Nota Fiscal Eletrônica (NFC-e / NF-e) desta venda para a SEFAZ-GO?
+                    </p>
+                    {sefazError && (
+                      <div className="bg-red-500/5 border border-red-500/10 p-3 rounded-xl text-[10px] text-red-400 font-bold leading-normal">
+                        {sefazError}
+                      </div>
+                    )}
+                    <button
+                      onClick={() => handleEmitirNfe(savedSale)}
+                      className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+                    >
+                      <Send size={14} />
+                      Emitir Nota Fiscal Oficial
+                    </button>
+                  </div>
+                )}
+
+                {sefazLoading && (
+                  <div className="py-4 flex flex-col items-center justify-center gap-2">
+                    <Loader2 className="animate-spin text-primary" size={24} />
+                    <p className="text-xs font-bold text-white/60">Processando junto à SEFAZ-GO...</p>
+                    <p className="text-[9px] text-white/30 italic">Assinando XML com certificado A1 e transmitindo...</p>
+                  </div>
+                )}
+
+                {sefazSuccess && (
+                  <div className="space-y-4">
+                    <div className="p-3 bg-green-500/5 border border-green-500/10 rounded-xl text-xs text-green-400 font-bold flex items-center justify-center gap-2">
+                      <CheckCircle2 size={16} />
+                      Nota Fiscal Autorizada com Sucesso!
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      {danfeUrl && (
+                        <a
+                          href={danfeUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="py-2.5 bg-primary text-black font-black rounded-xl text-center text-xs flex items-center justify-center gap-1.5 hover:scale-105 transition-all shadow-lg shadow-primary/10"
+                        >
+                          <ExternalLink size={14} />
+                          Ver DANFE
+                        </a>
+                      )}
+                      {notaInfo?.xml && (
+                        <button
+                          onClick={() => SefazService.baixarXML(notaInfo.chave, notaInfo.xml)}
+                          className="py-2.5 bg-white/5 border border-white/10 hover:bg-white/10 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all"
+                        >
+                          <Download size={14} />
+                          Baixar XML
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {client?.whatsapp && (
                 <div className="mt-6 animate-in slide-in-from-bottom-4 duration-500">
                   <button 
@@ -398,7 +523,7 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
                       client.whatsapp,
                       `Olá, ${client.name}! Segue o comprovante da sua compra na Ótica Lis:\n\nO.S: ${savedSale?.os_number}\nValor: R$ ${savedSale?.valor_total}\n\nMuito obrigado pela confiança! 👓✨`
                     )}
-                    className="flex items-center gap-2 text-green-500 font-bold hover:underline"
+                    className="flex items-center gap-2 text-green-500 font-bold hover:underline text-xs"
                   >
                     <MessageSquare size={18} />
                     Enviar Comprovante via WhatsApp
