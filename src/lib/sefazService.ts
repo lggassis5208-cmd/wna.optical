@@ -255,7 +255,36 @@ export const SefazService = {
       }
     }
 
-    // --- FALLBACK: SIMULAÇÃO FISCAL DE ALTA FIDELIDADE ---
+    // --- NOVA INTEGRAÇÃO: BACKEND VERCEL SERVERLESS (COM CERTIFICADO A1) ---
+    if (settings.certificado?.configurado && settings.certificado?.pfx_base64) {
+      try {
+        const response = await fetch('/api/sefaz', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sale, settings, modelo: payload.destinatario.cpf_cnpj.length === 14 ? '55' : '65' })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.sucesso) {
+          return data; // { sucesso: true, chave_acesso, xml, etc }
+        } else {
+          return {
+            sucesso: false,
+            status: 'rejeitada',
+            motivo_rejeicao: `Erro no Servidor de Assinatura (Vercel): ${data.motivo_rejeicao || data.error}`
+          };
+        }
+      } catch (error: any) {
+        return {
+          sucesso: false,
+          status: 'rejeitada',
+          motivo_rejeicao: `Falha ao conectar com a API de Assinatura (/api/sefaz): ${error.message}`
+        };
+      }
+    }
+
+    // --- FALLBACK: SIMULAÇÃO FISCAL DE ALTA FIDELIDADE (SEM CERTIFICADO A1) ---
     // Simula tempo de processamento da receita/SEFAZ
     await new Promise(resolve => setTimeout(resolve, 2500));
 

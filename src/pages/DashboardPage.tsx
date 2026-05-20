@@ -156,6 +156,11 @@ export default function DashboardPage() {
     };
 
     fetchData();
+
+    // Sincronização em tempo real (Fase 1)
+    const handleUpdate = () => fetchData();
+    window.addEventListener('lis_sale_updated', handleUpdate);
+    return () => window.removeEventListener('lis_sale_updated', handleUpdate);
   }, []);
 
   return (
@@ -171,7 +176,6 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      {/* KPI GRID */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <KPICard 
           title="Vendas Hoje" 
@@ -179,6 +183,7 @@ export default function DashboardPage() {
           icon={<Wallet className="text-primary" size={24} />} 
           subtext="Faturamento do dia"
           color="border-l-primary"
+          onClick={() => navigate('/vendas')}
         />
         <KPICard 
           title="O.S. em Aberto" 
@@ -186,6 +191,7 @@ export default function DashboardPage() {
           icon={<Clock className="text-yellow-500" size={24} />} 
           subtext="Aguardando produção"
           color="border-l-yellow-500"
+          onClick={() => navigate('/vendas')}
         />
         <KPICard 
           title="Novos Clientes" 
@@ -193,6 +199,7 @@ export default function DashboardPage() {
           icon={<UserPlus className="text-blue-400" size={24} />} 
           subtext="Este mês"
           color="border-l-blue-400"
+          onClick={() => navigate('/clientes')}
         />
         <KPICard 
           title="Estoque Baixo" 
@@ -201,6 +208,7 @@ export default function DashboardPage() {
           subtext="Abaixo de 5 un."
           color="border-l-red-400"
           highlight={stats.estoqueBaixo > 0}
+          onClick={() => navigate('/estoque')}
         />
       </div>
 
@@ -451,9 +459,12 @@ export default function DashboardPage() {
   );
 }
 
-function KPICard({ title, value, icon, subtext, color, highlight = false }: any) {
+function KPICard({ title, value, icon, subtext, color, highlight = false, onClick }: any) {
   return (
-    <div className={`bg-surface p-6 rounded-3xl border border-white/5 border-l-4 ${color} transition-all duration-300 hover:translate-y-[-4px] group relative overflow-hidden ${highlight ? 'bg-red-500/[0.02]' : 'bg-white/[0.01]'}`}>
+    <div 
+      onClick={onClick}
+      className={`bg-surface p-6 rounded-3xl border border-white/5 border-l-4 ${color} transition-all duration-300 hover:translate-y-[-4px] group relative overflow-hidden cursor-pointer ${highlight ? 'bg-red-500/[0.02]' : 'bg-white/[0.01]'}`}
+    >
       <div className="flex justify-between items-start mb-4 relative z-10">
         <div className="p-3 bg-white/5 rounded-2xl group-hover:scale-110 transition-transform">
           {icon}

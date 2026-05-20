@@ -183,7 +183,31 @@ export default function SettingsPage() {
                       <p className="text-sm font-bold text-white">Fazer upload do certificado (.pfx ou .p12)</p>
                       <p className="text-xs text-white/30 mt-1">Seu certificado A1 é essencial para emitir NF-e.</p>
                    </div>
-                   <input type="file" id="cert-upload" className="hidden" accept=".pfx,.p12" onChange={() => setSettings({...settings, certificado: {...settings.certificado, configurado: true, arquivo_nome: 'certificado_otica_lis.pfx'}})} />
+                   <input 
+                     type="file" 
+                     id="cert-upload" 
+                     className="hidden" 
+                     accept=".pfx,.p12" 
+                     onChange={(e) => {
+                       const file = e.target.files?.[0];
+                       if (file) {
+                         const reader = new FileReader();
+                         reader.onload = (event) => {
+                           const base64String = (event.target?.result as string).split(',')[1];
+                           setSettings({
+                             ...settings, 
+                             certificado: {
+                               ...settings.certificado, 
+                               configurado: true, 
+                               arquivo_nome: file.name,
+                               pfx_base64: base64String
+                             }
+                           });
+                         };
+                         reader.readAsDataURL(file);
+                       }
+                     }} 
+                   />
                    <label htmlFor="cert-upload" className="inline-block bg-white/5 hover:bg-white/10 border border-white/10 px-6 py-2.5 rounded-xl text-sm font-bold text-white cursor-pointer transition-all">
                       Selecionar Arquivo
                    </label>
@@ -198,6 +222,8 @@ export default function SettingsPage() {
                           type={showPass ? 'text' : 'password'} 
                           className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-primary/50 text-white pr-12"
                           placeholder="********"
+                          value={settings.certificado.senha || ''}
+                          onChange={(e) => setSettings({...settings, certificado: {...settings.certificado, senha: e.target.value}})}
                         />
                         <button 
                           onClick={() => setShowPass(!showPass)}

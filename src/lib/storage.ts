@@ -196,6 +196,7 @@ export const storage = {
     };
     sales.push(newSale);
     localStorage.setItem('lis_vendas', JSON.stringify(sales));
+    window.dispatchEvent(new CustomEvent('lis_sale_updated'));
     return newSale;
   },
 
@@ -435,6 +436,7 @@ export const storage = {
       venda_id: novaVenda.id
     });
 
+    window.dispatchEvent(new CustomEvent('lis_sale_updated'));
     return novaVenda;
   },
 
@@ -540,6 +542,7 @@ export const storage = {
       }
 
       localStorage.setItem('lis_vendas', JSON.stringify(sales));
+      window.dispatchEvent(new CustomEvent('lis_sale_updated'));
       return sales[index];
     }
     return null;

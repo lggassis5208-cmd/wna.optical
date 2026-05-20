@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import ClientModal from '../components/ClientModal';
+import ClientProfileModal from '../components/ClientProfileModal';
 import { storage } from '../lib/storage';
 import { formatDate, getNowISO } from '../lib/dateUtils';
 
@@ -18,6 +19,8 @@ import Papa from 'papaparse';
 export default function ClientsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [clients, setClients] = useState<any[]>([]);
 
   const fetchClients = async () => {
@@ -151,6 +154,11 @@ export default function ClientsPage() {
       </div>
 
       <ClientModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      <ClientProfileModal 
+        isOpen={profileModalOpen} 
+        onClose={() => setProfileModalOpen(false)} 
+        clientId={selectedClientId} 
+      />
 
       <div className="bg-surface rounded-2xl border border-white/5 overflow-hidden shadow-xl">
         {/* Table Header/Toolbar */}
@@ -187,7 +195,14 @@ export default function ClientsPage() {
                    </td>
                 </tr>
               ) : filteredClients.map((client) => (
-                <tr key={client.id} className="hover:bg-white/[0.02] transition-colors group">
+                <tr 
+                  key={client.id} 
+                  className="hover:bg-white/[0.02] transition-colors group cursor-pointer"
+                  onClick={() => {
+                    setSelectedClientId(client.id);
+                    setProfileModalOpen(true);
+                  }}
+                >
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
@@ -220,8 +235,14 @@ export default function ClientsPage() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button className="p-2 hover:bg-white/5 rounded-lg text-white/30 hover:text-primary transition-colors cursor-pointer"><Mail size={18} /></button>
-                      <button className="p-2 hover:bg-white/5 rounded-lg text-white/30 hover:text-white transition-colors cursor-pointer">
+                      <button 
+                        className="p-2 hover:bg-white/5 rounded-lg text-white/30 hover:text-white transition-colors cursor-pointer"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // futuramente: editar cadastro
+                        }}
+                        title="Abrir Opções"
+                      >
                         <MoreVertical size={18} />
                       </button>
                     </div>

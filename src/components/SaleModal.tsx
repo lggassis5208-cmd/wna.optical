@@ -24,6 +24,8 @@ import { getNowISO } from '../lib/dateUtils';
 import { openWhatsApp } from '../lib/whatsappUtils';
 import { SefazService } from '../lib/sefazService';
 import PrintOS from './PrintOS';
+import PrintNFe from './PrintNFe';
+import PrintNFCe from './PrintNFCe';
 
 interface SaleModalProps {
   isOpen: boolean;
@@ -58,7 +60,8 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
   const [sefazSuccess, setSefazSuccess] = useState(false);
   const [sefazError, setSefazError] = useState('');
   const [danfeUrl, setDanfeUrl] = useState('');
-  const [notaInfo, setNotaInfo] = useState<{ xml: string, chave: string } | null>(null);
+  const [notaInfo, setNotaInfo] = useState<{ xml: string, chave: string, protocolo: string } | null>(null);
+  const [tipoImpressaoFisco, setTipoImpressaoFisco] = useState<'os' | '55' | '65'>('os');
 
   const [lenteSearch, setLenteSearch] = useState('');
   const [showLenteDropdown, setShowLenteDropdown] = useState(false);
@@ -68,7 +71,7 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
   const [showArmacaoDropdown, setShowArmacaoDropdown] = useState(false);
   const armacaoDropdownRef = useRef<HTMLDivElement>(null);
 
-  const handleEmitirNfe = async (sale: any) => {
+  const handleEmitirNfe = async (sale: any, modelo: '55' | '65') => {
     if (!sale) return;
     setSefazLoading(true);
     setSefazError('');
@@ -79,7 +82,8 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
         setDanfeUrl(result.danfe_url || '');
         setNotaInfo({
           xml: result.xml || '',
-          chave: result.chave_acesso || ''
+          chave: result.chave_acesso || '',
+          protocolo: result.protocolo || ''
         });
         
         // Salva a chave de acesso de 44 dígitos no histórico da venda
@@ -89,7 +93,9 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
 
         // Abre automaticamente em uma nova aba o PDF do DANFE oficial gerado pela API/governo
         if (result.danfe_url) {
-          window.open(result.danfe_url, '_blank');
+          // Aqui não abrimos em nova aba. Em vez disso, mudamos o estado para imprimir nosso componente interno A4.
+          setTipoImpressaoFisco(modelo);
+          setTimeout(() => window.print(), 800);
         }
 
         toast.success('Nota Fiscal emitida com sucesso!', {
@@ -333,6 +339,7 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
     setSefazError('');
     setDanfeUrl('');
     setNotaInfo(null);
+    setTipoImpressaoFisco('os');
     // Reset estados de cliente e produto
     setClientSearch('');
     setShowClientDropdown(false);
@@ -346,8 +353,11 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
     onClose();
   };
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = (tipo: 'os' | '55' | '65' = 'os') => {
+    setTipoImpressaoFisco(tipo);
+    setTimeout(() => {
+      window.print();
+    }, 100);
   };
 
   if (!isOpen) return null;
@@ -711,16 +721,9 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
               <div className="flex gap-4">
                 <button 
                   onClick={handlePrint}
-                  className="bg-primary text-black px-8 py-4 rounded-2xl text-sm font-black shadow-lg shadow-primary/20 flex items-center gap-3 hover:scale-105 transition-all active:scale-95"
-                >
-                  <Printer size={20} />
-                  Imprimir O.S. / Recibo
-                </button>
-                <button 
-                  onClick={handleClose}
                   className="bg-white/5 border border-white/10 text-white px-8 py-4 rounded-2xl text-sm font-black hover:bg-white/10 transition-all uppercase tracking-widest"
                 >
-                  Concluir
+                  Fechar
                 </button>
               </div>
 
@@ -738,20 +741,36 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
                 {!sefazSuccess && !sefazLoading && (
                   <div className="space-y-4">
                     <p className="text-xs text-white/40 leading-relaxed italic">
-                      Deseja gerar e enviar a Nota Fiscal Eletrônica (NFC-e / NF-e) desta venda para a SEFAZ-GO?
+                      Selecione o documento de saída desejado para esta venda:
                     </p>
                     {sefazError && (
                       <div className="bg-red-500/5 border border-red-500/10 p-3 rounded-xl text-[10px] text-red-400 font-bold leading-normal">
                         {sefazError}
                       </div>
                     )}
-                    <button
-                      onClick={() => handleEmitirNfe(savedSale)}
-                      className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
-                    >
-                      <Send size={14} />
-                      Emitir Nota Fiscal Oficial
-                    </button>
+                    <div className="grid grid-cols-1 gap-3">
+                      <button
+                        onClick={() => handlePrint('os')}
+                        className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+                      >
+                        <Printer size={14} />
+                        Imprimir NF (O.S. / Gerencial)
+                      </button>
+                      <button
+                        onClick={() => handleEmitirNfe(savedSale, '55')}
+                        className="w-full py-3 bg-primary/10 hover:bg-primary/20 border border-primary/20 text-primary font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+                      >
+                        <Send size={14} />
+                        Emitir e Imprimir NF-e (Mod. 55)
+                      </button>
+                      <button
+                        onClick={() => handleEmitirNfe(savedSale, '65')}
+                        className="w-full py-3 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-400 font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+                      >
+                        <Send size={14} />
+                        Emitir e Imprimir DANFE/NFC-e
+                      </button>
+                    </div>
                   </div>
                 )}
 
@@ -770,17 +789,13 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
                       Nota Fiscal Autorizada com Sucesso!
                     </div>
                     <div className="grid grid-cols-2 gap-3">
-                      {danfeUrl && (
-                        <a
-                          href={danfeUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="py-2.5 bg-primary text-black font-black rounded-xl text-center text-xs flex items-center justify-center gap-1.5 hover:scale-105 transition-all shadow-lg shadow-primary/10"
-                        >
-                          <ExternalLink size={14} />
-                          Ver DANFE
-                        </a>
-                      )}
+                      <button
+                        onClick={() => handlePrint(tipoImpressaoFisco)}
+                        className="py-2.5 bg-primary text-black font-black rounded-xl text-center text-xs flex items-center justify-center gap-1.5 hover:scale-105 transition-all shadow-lg shadow-primary/10"
+                      >
+                        <Printer size={14} />
+                        Reimprimir DANFE
+                      </button>
                       {notaInfo?.xml && (
                         <button
                           onClick={() => SefazService.baixarXML(notaInfo.chave, notaInfo.xml)}
@@ -796,22 +811,28 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
               </div>
 
               {client?.whatsapp && (
-                <div className="mt-6 animate-in slide-in-from-bottom-4 duration-500">
+                <div className="mt-6 animate-in slide-in-from-bottom-4 duration-500 w-full max-w-md">
                   <button 
                     onClick={() => openWhatsApp(
                       client.whatsapp,
-                      `Olá, ${client.name}! Segue o comprovante da sua compra na Ótica Lis:\n\nO.S: ${savedSale?.os_number}\nValor: R$ ${savedSale?.valor_total}\n\nMuito obrigado pela confiança! 👓✨`
+                      `Olá, ${client.name}! Seu pedido de venda foi registrado com sucesso na Ótica Lìs. Seguem os detalhes:\n\nItens: ${savedSale?.tipo_lente} ${savedSale?.tratamento}\nPagamento: ${savedSale?.forma_pagamento}\nValor Total: R$ ${Number(savedSale?.valor_total || 0).toFixed(2)}\n\nObrigado pela preferência!`
                     )}
-                    className="flex items-center gap-2 text-green-500 font-bold hover:underline text-xs"
+                    className="w-full py-4 bg-[#25D366]/20 hover:bg-[#25D366]/30 border border-[#25D366]/50 text-[#25D366] font-black rounded-2xl text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-[#25D366]/10"
                   >
                     <MessageSquare size={18} />
-                    Enviar Comprovante via WhatsApp
+                    Enviar Resumo no WhatsApp
                   </button>
                 </div>
               )}
 
-              {savedSale && settings && (
+              {savedSale && settings && tipoImpressaoFisco === 'os' && (
                 <PrintOS sale={savedSale} settings={settings} />
+              )}
+              {savedSale && settings && tipoImpressaoFisco === '55' && (
+                <PrintNFe sale={savedSale} settings={settings} chaveAcesso={notaInfo?.chave} protocolo={notaInfo?.protocolo} />
+              )}
+              {savedSale && settings && tipoImpressaoFisco === '65' && (
+                <PrintNFCe sale={savedSale} settings={settings} chaveAcesso={notaInfo?.chave} protocolo={notaInfo?.protocolo} />
               )}
             </div>
           )}
