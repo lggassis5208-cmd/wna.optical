@@ -17,9 +17,26 @@ export default function PrintNFe({ sale, settings, chaveAcesso, protocolo }: Pri
   };
 
   const getAddress = () => {
+    if (sale.cliente_endereco) return sale.cliente_endereco;
     if (settings?.empresa?.endereco) return settings.empresa.endereco;
     return getEffectiveAddress(sale.criado_em);
   };
+
+  const getBairro = () => sale.cliente_bairro || 'Não Informado';
+  const getCep = () => sale.cliente_cep || '00000-000';
+
+  const items = sale.itens && sale.itens.length > 0 ? sale.itens : [
+    {
+      id: '001',
+      nome: `LENTE ${sale.tipo_lente || ''} ${sale.tratamento || ''}`.trim(),
+      ncm: '90031100',
+      qtd: 1,
+      vUn: Number(sale.valor_total || 0),
+      vTot: Number(sale.valor_total || 0)
+    }
+  ];
+
+  const totalGeral = items.reduce((acc: number, item: any) => acc + Number(item.vTot || 0), 0);
 
   return (
     <div className="hidden print:block absolute inset-0 bg-white text-black font-sans text-[10px] w-full min-h-screen">
@@ -121,22 +138,51 @@ export default function PrintNFe({ sale, settings, chaveAcesso, protocolo }: Pri
              </div>
           </div>
           <div className="flex">
-             <div className="w-[45%] border-r border-black p-1">
+              <div className="w-[45%] border-r border-black p-1">
                 <p className="uppercase text-[7px]">Endereço</p>
-                <p className="font-bold">Não Informado</p>
+                <p className="font-bold truncate">{getAddress()}</p>
              </div>
              <div className="w-[25%] border-r border-black p-1">
                 <p className="uppercase text-[7px]">Bairro/Distrito</p>
-                <p className="font-bold">Não Informado</p>
+                <p className="font-bold truncate">{getBairro()}</p>
              </div>
              <div className="w-[10%] border-r border-black p-1">
                 <p className="uppercase text-[7px]">CEP</p>
-                <p className="font-bold">00000-000</p>
+                <p className="font-bold">{getCep()}</p>
              </div>
              <div className="w-[20%] p-1">
                 <p className="uppercase text-[7px]">Data Saída/Entrada</p>
                 <p className="font-bold">{formatDate(sale.criado_em).split(' ')[0]}</p>
              </div>
+          </div>
+        </div>
+
+        {/* RECEITA CLÍNICA TÉCNICA (ESPECÍFICO DE ERP ÓPTICO) */}
+        <p className="font-bold text-[9px] mb-0.5 uppercase text-primary">Receita / Ficha Clínica Vinculada</p>
+        <div className="border border-black mb-2 flex flex-col text-[8px] bg-white/[0.02]">
+          <div className="flex border-b border-black font-bold bg-gray-100">
+             <div className="w-[20%] border-r border-black p-1">Olho</div>
+             <div className="w-[16%] border-r border-black p-1 text-center">Esférico</div>
+             <div className="w-[16%] border-r border-black p-1 text-center">Cilíndrico</div>
+             <div className="w-[16%] border-r border-black p-1 text-center">Eixo</div>
+             <div className="w-[16%] border-r border-black p-1 text-center">Adição</div>
+             <div className="w-[16%] p-1 text-center">DNP</div>
+          </div>
+          <div className="flex border-b border-black">
+             <div className="w-[20%] border-r border-black p-1 font-bold">OD (Direito)</div>
+             <div className="w-[16%] border-r border-black p-1 text-center">{sale.od_esferico || '0.00'}</div>
+             <div className="w-[16%] border-r border-black p-1 text-center">{sale.od_cilindrico || '0.00'}</div>
+             <div className="w-[16%] border-r border-black p-1 text-center">{sale.od_eixo || '0'}°</div>
+             <div className="w-[16%] border-r border-black p-1 text-center">{sale.od_adicao || '0.00'}</div>
+             <div className="w-[16%] p-1 text-center">{sale.od_dnp || '0'}</div>
+          </div>
+          <div className="flex">
+             <div className="w-[20%] border-r border-black p-1 font-bold">OE (Esquerdo)</div>
+             <div className="w-[16%] border-r border-black p-1 text-center">{sale.oe_esferico || '0.00'}</div>
+             <div className="w-[16%] border-r border-black p-1 text-center">{sale.oe_cilindrico || '0.00'}</div>
+             <div className="w-[16%] border-r border-black p-1 text-center">{sale.oe_eixo || '0'}°</div>
+             <div className="w-[16%] border-r border-black p-1 text-center">{sale.oe_adicao || '0.00'}</div>
+             <div className="w-[16%] p-1 text-center">{sale.oe_dnp || '0'}</div>
           </div>
         </div>
 
@@ -161,13 +207,13 @@ export default function PrintNFe({ sale, settings, chaveAcesso, protocolo }: Pri
            </div>
            <div className="flex-1 p-1">
               <p className="uppercase text-[7px]">Valor Total dos Produtos</p>
-              <p className="font-bold text-right">{Number(sale.valor_total).toFixed(2).replace('.', ',')}</p>
+              <p className="font-bold text-right">{totalGeral.toFixed(2).replace('.', ',')}</p>
            </div>
         </div>
 
         {/* DADOS DOS PRODUTOS */}
         <p className="font-bold text-[9px] mb-0.5 uppercase">Dados do Produto/Serviço</p>
-        <div className="border border-black min-h-[100mm] mb-2">
+        <div className="border border-black min-h-[75mm] mb-2">
           <table className="w-full text-[8px]">
             <thead>
               <tr className="border-b border-black">
@@ -183,17 +229,19 @@ export default function PrintNFe({ sale, settings, chaveAcesso, protocolo }: Pri
               </tr>
             </thead>
             <tbody>
-               <tr>
-                  <td className="border-r border-black p-1">001</td>
-                  <td className="border-r border-black p-1">LENTE {sale.tipo_lente} {sale.tratamento}</td>
-                  <td className="border-r border-black p-1 text-center">90031100</td>
-                  <td className="border-r border-black p-1 text-center">0102</td>
-                  <td className="border-r border-black p-1 text-center">5102</td>
-                  <td className="border-r border-black p-1 text-center">UN</td>
-                  <td className="border-r border-black p-1 text-right">1.00</td>
-                  <td className="border-r border-black p-1 text-right">{Number(sale.valor_total).toFixed(2).replace('.', ',')}</td>
-                  <td className="p-1 text-right">{Number(sale.valor_total).toFixed(2).replace('.', ',')}</td>
-               </tr>
+               {items.map((item: any, i: number) => (
+                 <tr key={i}>
+                    <td className="border-r border-black p-1">{item.id || item.codigo || `00${i+1}`}</td>
+                    <td className="border-r border-black p-1">{item.nome}</td>
+                    <td className="border-r border-black p-1 text-center">{item.ncm || '90031100'}</td>
+                    <td className="border-r border-black p-1 text-center">0102</td>
+                    <td className="border-r border-black p-1 text-center">5102</td>
+                    <td className="border-r border-black p-1 text-center">UN</td>
+                    <td className="border-r border-black p-1 text-right">{Number(item.qtd || 1).toFixed(2)}</td>
+                    <td className="border-r border-black p-1 text-right">{Number(item.vUn || 0).toFixed(2).replace('.', ',')}</td>
+                    <td className="p-1 text-right">{Number(item.vTot || 0).toFixed(2).replace('.', ',')}</td>
+                 </tr>
+               ))}
             </tbody>
           </table>
         </div>

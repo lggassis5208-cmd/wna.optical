@@ -263,6 +263,7 @@ const PrintOS: React.FC<PrintOSProps> = ({ sale, settings }) => {
             <div style={{ fontSize: '8px', color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>VALOR TOTAL</div>
             <div style={{ fontSize: '20px', fontWeight: 800, color: '#000' }}>R$ {Number(sale.valor_total || 0).toFixed(2)}</div>
           </div>
+          </div>
         </div>
       </div>
 

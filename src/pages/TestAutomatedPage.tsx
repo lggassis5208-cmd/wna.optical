@@ -31,7 +31,7 @@ export default function TestAutomatedPage() {
 
       const generatedSales = [];
 
-      for (let i = 1; i <= 3; i++) {
+      for (let i = 1; i <= 15; i++) {
         addLog(`--- Iniciando Fluxo do Cliente ${i} ---`);
         
         // 1. Cadastrar Cliente
@@ -139,10 +139,10 @@ export default function TestAutomatedPage() {
           <p className="text-white/60">
             Este painel executará a seguinte bateria:
             <br/><br/>
-            1. <b>Cadastro:</b> 3 novos clientes.<br/>
-            2. <b>Venda/O.S:</b> 3 ordens de serviço geradas e vinculadas.<br/>
-            3. <b>Faturamento:</b> 3 notas fiscais emitidas automaticamente.<br/>
-            4. <b>Arquivamento:</b> Geração e download simultâneo de 3 PDFs A4.<br/>
+            1. <b>Cadastro:</b> 15 novos clientes.<br/>
+            2. <b>Venda/O.S:</b> 15 ordens de serviço geradas e vinculadas.<br/>
+            3. <b>Faturamento:</b> 15 notas fiscais emitidas automaticamente.<br/>
+            4. <b>Arquivamento:</b> Geração e download simultâneo de 15 PDFs A4.<br/>
           </p>
           <button 
             onClick={runTests}

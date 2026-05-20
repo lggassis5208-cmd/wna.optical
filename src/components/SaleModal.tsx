@@ -408,7 +408,9 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
              <div className="h-full flex items-center justify-center">
                 <Loader2 className="animate-spin text-primary" size={40} />
              </div>
-                      {step === 1 && (
+          ) : (
+            <>
+              {step === 1 && (
             <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
               {/* === BUSCA INTELIGENTE DE CLIENTES === */}
               <section className="space-y-4">
@@ -617,8 +619,6 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
                   )}
                 </div>
               </section>
-            </div>
-          )}ion>
             </div>
           )}
 

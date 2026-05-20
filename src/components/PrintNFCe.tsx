@@ -23,6 +23,19 @@ export default function PrintNFCe({ sale, settings, chaveAcesso, protocolo }: Pr
 
   const urlConsulta = 'http://nfe.sefaz.go.gov.br/nfeweb/sites/nfce/danfeNFCe';
 
+  const items = sale.itens && sale.itens.length > 0 ? sale.itens : [
+    {
+      id: '001',
+      nome: `LENTE ${sale.tipo_lente || ''} ${sale.tratamento || ''}`.trim(),
+      qtd: 1,
+      vUn: Number(sale.valor_total || 0),
+      vTot: Number(sale.valor_total || 0)
+    }
+  ];
+
+  const totalGeral = items.reduce((acc: number, item: any) => acc + Number(item.vTot || 0), 0);
+  const totalQtd = items.reduce((acc: number, item: any) => acc + Number(item.qtd || 1), 0);
+
   return (
     <div className="hidden print:flex absolute inset-0 bg-white text-black font-sans text-[12px] w-full min-h-screen justify-center pt-10">
       <style>
@@ -56,13 +69,15 @@ export default function PrintNFCe({ sale, settings, chaveAcesso, protocolo }: Pr
                </tr>
              </thead>
              <tbody>
-               <tr>
-                 <td>001</td>
-                 <td>LENTE {sale.tipo_lente} {sale.tratamento}</td>
-                 <td className="text-right">1</td>
-                 <td className="text-right">{Number(sale.valor_total).toFixed(2)}</td>
-                 <td className="text-right">{Number(sale.valor_total).toFixed(2)}</td>
-               </tr>
+               {items.map((item: any, i: number) => (
+                 <tr key={i}>
+                   <td className="align-top py-0.5">{item.id || item.codigo || `00${i+1}`}</td>
+                   <td className="align-top py-0.5">{item.nome}</td>
+                   <td className="text-right align-top py-0.5">{Number(item.qtd || 1)}</td>
+                   <td className="text-right align-top py-0.5">{Number(item.vUn || 0).toFixed(2)}</td>
+                   <td className="text-right align-top py-0.5">{Number(item.vTot || 0).toFixed(2)}</td>
+                 </tr>
+               ))}
              </tbody>
            </table>
         </div>
@@ -70,11 +85,11 @@ export default function PrintNFCe({ sale, settings, chaveAcesso, protocolo }: Pr
         <div className="text-[12px] font-bold">
            <div className="flex justify-between">
               <span>Qtd Total de Itens</span>
-              <span>1</span>
+              <span>{totalQtd}</span>
            </div>
            <div className="flex justify-between mt-1 text-sm">
               <span>VALOR TOTAL R$</span>
-              <span>{Number(sale.valor_total).toFixed(2).replace('.', ',')}</span>
+              <span>{totalGeral.toFixed(2).replace('.', ',')}</span>
            </div>
            <div className="flex justify-between mt-1 text-[10px] font-normal">
               <span>Forma de Pagamento</span>
@@ -82,7 +97,7 @@ export default function PrintNFCe({ sale, settings, chaveAcesso, protocolo }: Pr
            </div>
            <div className="flex justify-between text-[11px]">
               <span>{sale.forma_pagamento || 'Cartão'}</span>
-              <span>{Number(sale.valor_total).toFixed(2).replace('.', ',')}</span>
+              <span>{totalGeral.toFixed(2).replace('.', ',')}</span>
            </div>
         </div>
 
