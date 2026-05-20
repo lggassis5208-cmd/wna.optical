@@ -70,8 +70,13 @@ export default function ClientModal({ isOpen, onClose }: ClientModalProps) {
   };
 
   const handleSave = async () => {
-    if (!formData.name || !formData.whatsapp) {
-      toast.error('Preencha Nome e WhatsApp');
+    if (!formData.name) {
+      toast.error('Nome é obrigatório.');
+      return;
+    }
+    const whatsappLimpo = (formData.whatsapp || '').replace(/\D/g, '');
+    if (!whatsappLimpo || whatsappLimpo.length < 10) {
+      toast.error('WhatsApp é obrigatório. Digite o número completo com DDD (mínimo 10 dígitos).');
       return;
     }
 

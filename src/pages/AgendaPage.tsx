@@ -7,7 +7,11 @@ import {
   X, 
   Loader2,
   RefreshCw,
-  MessageSquare
+  MessageSquare,
+  UserPlus,
+  CheckCircle2,
+  Phone,
+  User
 } from 'lucide-react';
 import { storage } from '../lib/storage';
 import { openWhatsApp } from '../lib/whatsappUtils';
@@ -167,37 +171,120 @@ export default function AgendaPage() {
   );
 }
 
+// ============================================================
+// MODAL DE AGENDAMENTO INTELIGENTE
+// ============================================================
 function AgendamentoModal({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
   const [loading, setLoading] = useState(false);
   const [clients, setClients] = useState<any[]>([]);
+  const [searchCpf, setSearchCpf] = useState('');
+  const [selectedClient, setSelectedClient] = useState<any>(null);
+  const [showMiniCadastro, setShowMiniCadastro] = useState(false);
+  const [showWhatsAppConfirm, setShowWhatsAppConfirm] = useState(false);
+  const [savedAgendamento, setSavedAgendamento] = useState<any>(null);
+
+  // Mini-cadastro fields
+  const [novoNome, setNovoNome] = useState('');
+  const [novoCpf, setNovoCpf] = useState('');
+  const [novoWhatsapp, setNovoWhatsapp] = useState('');
+  const [novoNascimento, setNovoNascimento] = useState('');
+
   const [formData, setFormData] = useState({
-    paciente_nome: '',
-    paciente_cpf: '',
     data: '',
     horario: '',
-    status: 'AGENDADO'
   });
 
   useEffect(() => {
     if (isOpen) {
       storage.getClients().then(setClients);
+      // Reset state
+      setSelectedClient(null);
+      setSearchCpf('');
+      setShowMiniCadastro(false);
+      setShowWhatsAppConfirm(false);
+      setSavedAgendamento(null);
+      setNovoNome('');
+      setNovoCpf('');
+      setNovoWhatsapp('');
+      setNovoNascimento('');
+      setFormData({ data: '', horario: '' });
     }
   }, [isOpen]);
 
+  // Filtra clientes conforme o termo de busca
+  const filteredClients = searchCpf.length > 1 
+    ? clients.filter(c => 
+        c.cpf?.includes(searchCpf) || 
+        (c.name || c.nome_completo || '').toLowerCase().includes(searchCpf.toLowerCase())
+      )
+    : [];
+
+  const handleSelectClient = (client: any) => {
+    setSelectedClient(client);
+    setSearchCpf('');
+    setShowMiniCadastro(false);
+  };
+
+  const handleCadastrarNovo = async () => {
+    if (!novoNome.trim()) return toast.error('Nome é obrigatório.');
+    const whatsappLimpo = novoWhatsapp.replace(/\D/g, '');
+    if (!whatsappLimpo || whatsappLimpo.length < 10) return toast.error('WhatsApp inválido. Digite o número completo com DDD.');
+
+    setLoading(true);
+    try {
+      const newClient = await storage.saveClient({
+        nome_completo: novoNome.trim(),
+        cpf: novoCpf.replace(/\D/g, ''),
+        whatsapp: whatsappLimpo,
+        data_nascimento: novoNascimento || null,
+        lis_score: 850
+      });
+      setSelectedClient({ ...newClient, name: newClient.nome_completo || novoNome });
+      setShowMiniCadastro(false);
+      // Refresh clients list
+      const updatedClients = await storage.getClients();
+      setClients(updatedClients);
+      toast.success('Cliente cadastrado com sucesso!');
+    } catch (e: any) {
+      toast.error('Erro ao cadastrar cliente: ' + (e.message || ''));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSave = async () => {
-    if (!formData.data || !formData.horario || !formData.paciente_nome) {
-      toast.error('Preencha todos os campos');
-      return;
+    if (!selectedClient) return toast.error('Selecione um cliente para agendar.');
+    if (!formData.data) return toast.error('Selecione uma data.');
+    if (!formData.horario) return toast.error('Selecione um horário.');
+
+    const clientWhatsapp = selectedClient.whatsapp?.replace(/\D/g, '') || '';
+    if (!clientWhatsapp || clientWhatsapp.length < 10) {
+      return toast.error('Este cliente não possui WhatsApp válido. Atualize o cadastro antes de agendar.');
     }
 
     setLoading(true);
     try {
-      await storage.saveExame(formData);
+      const result = await storage.saveExame({
+        cliente_id: selectedClient.id,
+        data: formData.data,
+        horario: formData.horario,
+        status: 'AGENDADO',
+        // Campos de fallback para localStorage
+        paciente_nome: selectedClient.name || selectedClient.nome_completo,
+        paciente_cpf: selectedClient.cpf,
+        paciente_whatsapp: clientWhatsapp
+      });
+
+      setSavedAgendamento({
+        ...result,
+        paciente_nome: selectedClient.name || selectedClient.nome_completo,
+        paciente_whatsapp: clientWhatsapp
+      });
+
+      setShowWhatsAppConfirm(true);
       toast.success('Agendamento realizado com sucesso!');
-      onClose();
     } catch (e) {
-      toast.error('Erro ao salvar agendamento');
+      toast.error('Erro ao salvar agendamento.');
     } finally {
       setLoading(false);
     }
@@ -205,6 +292,54 @@ function AgendamentoModal({ isOpen, onClose }: { isOpen: boolean, onClose: () =>
 
   if (!isOpen) return null;
 
+  // ---- TELA DE CONFIRMAÇÃO WHATSAPP ----
+  if (showWhatsAppConfirm && savedAgendamento) {
+    const dataFormatada = new Date(savedAgendamento.data + 'T12:00:00').toLocaleDateString('pt-BR', {
+      weekday: 'long', day: '2-digit', month: 'long'
+    });
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+        <div className="bg-surface w-full max-w-md rounded-3xl border border-white/10 shadow-2xl overflow-hidden animate-in zoom-in-95">
+          <div className="p-8 text-center space-y-6">
+            <div className="w-20 h-20 mx-auto rounded-full bg-green-500/20 flex items-center justify-center animate-in zoom-in duration-500">
+              <CheckCircle2 size={40} className="text-green-500" />
+            </div>
+            <div>
+              <h3 className="text-xl font-black text-white">Agendamento Confirmado!</h3>
+              <p className="text-white/50 text-sm mt-2">
+                <span className="font-bold text-white">{savedAgendamento.paciente_nome}</span> agendado para{' '}
+                <span className="text-primary font-bold">{dataFormatada}</span> às{' '}
+                <span className="text-primary font-bold">{savedAgendamento.horario}</span>
+              </p>
+            </div>
+
+            <button
+              onClick={() => {
+                openWhatsApp(
+                  savedAgendamento.paciente_whatsapp,
+                  `Olá, ${savedAgendamento.paciente_nome}! Seu exame de vista na Ótica Lìs foi agendado com sucesso para o dia ${dataFormatada} às ${savedAgendamento.horario}. Te aguardamos na Vila Concórdia! Qualquer dúvida, fale conosco.`
+                );
+              }}
+              className="w-full bg-green-500 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-3 hover:bg-green-600 transition-all active:scale-95 shadow-lg shadow-green-500/30 text-lg"
+            >
+              <MessageSquare size={24} />
+              Enviar Confirmação de Agendamento
+            </button>
+
+            <button
+              onClick={onClose}
+              className="text-white/30 hover:text-white text-sm font-bold transition-colors"
+            >
+              Fechar sem enviar
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ---- FORMULÁRIO PRINCIPAL DE AGENDAMENTO ----
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
       <div className="bg-surface w-full max-w-lg rounded-3xl border border-white/10 shadow-2xl overflow-hidden animate-in zoom-in-95">
@@ -221,34 +356,142 @@ function AgendamentoModal({ isOpen, onClose }: { isOpen: boolean, onClose: () =>
         </div>
 
         <div className="p-8 space-y-6">
-          <div className="space-y-4">
-            <label className="text-xs font-bold text-white/20 uppercase tracking-widest ml-1">Buscar Paciente (CPF)</label>
-            <div className="relative group">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-primary transition-colors">
-                <Search size={18} />
+          {/* STEP 1: Selecionar ou Cadastrar Cliente */}
+          <div className="space-y-3">
+            <label className="text-xs font-bold text-white/20 uppercase tracking-widest ml-1 flex items-center gap-2">
+              <User size={14} />
+              Paciente
+            </label>
+
+            {selectedClient ? (
+              <div className="flex items-center gap-3 p-4 bg-primary/10 border border-primary/20 rounded-xl">
+                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-lg">
+                  {(selectedClient.name || selectedClient.nome_completo || 'C').charAt(0)}
+                </div>
+                <div className="flex-1">
+                  <p className="font-bold text-white">{selectedClient.name || selectedClient.nome_completo}</p>
+                  <p className="text-xs text-white/40">{selectedClient.cpf} • <Phone size={10} className="inline" /> {selectedClient.whatsapp}</p>
+                </div>
+                <button 
+                  onClick={() => setSelectedClient(null)}
+                  className="p-1.5 hover:bg-white/10 rounded-lg text-white/40 hover:text-white transition-colors"
+                >
+                  <X size={16} />
+                </button>
               </div>
-              <input 
-                type="text" 
-                placeholder="000.000.000-00"
-                className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-sm focus:outline-none focus:border-primary/50 transition-colors"
-                value={formData.paciente_cpf}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setFormData({...formData, paciente_cpf: val});
-                  const found = clients.find(c => c.cpf?.includes(val));
-                  if (found && val.length > 5) setFormData(prev => ({ ...prev, paciente_nome: found.name, paciente_cpf: found.cpf }));
-                }}
-              />
-            </div>
-            <input 
-              type="text" 
-              placeholder="Nome do Paciente"
-              className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-primary/50 transition-colors"
-              value={formData.paciente_nome}
-              onChange={(e) => setFormData({...formData, paciente_nome: e.target.value})}
-            />
+            ) : (
+              <>
+                <div className="relative group">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-primary transition-colors">
+                    <Search size={18} />
+                  </div>
+                  <input 
+                    type="text" 
+                    placeholder="Buscar por nome ou CPF..."
+                    className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-sm focus:outline-none focus:border-primary/50 transition-colors"
+                    value={searchCpf}
+                    onChange={(e) => {
+                      setSearchCpf(e.target.value);
+                      setShowMiniCadastro(false);
+                    }}
+                  />
+                </div>
+
+                {/* Dropdown de resultados */}
+                {filteredClients.length > 0 && (
+                  <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden max-h-40 overflow-y-auto">
+                    {filteredClients.slice(0, 5).map(client => (
+                      <button
+                        key={client.id}
+                        onClick={() => handleSelectClient(client)}
+                        className="w-full px-4 py-3 text-left hover:bg-primary/10 transition-colors flex items-center gap-3 border-b border-white/5 last:border-0"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
+                          {(client.name || client.nome_completo || 'C').charAt(0)}
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-white">{client.name || client.nome_completo}</p>
+                          <p className="text-[10px] text-white/30">{client.cpf} • {client.whatsapp}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Botão para cadastrar novo */}
+                {searchCpf.length > 2 && filteredClients.length === 0 && !showMiniCadastro && (
+                  <button
+                    onClick={() => {
+                      setShowMiniCadastro(true);
+                      setNovoNome(searchCpf.replace(/[0-9.-]/g, '').trim());
+                      setNovoCpf(searchCpf.replace(/\D/g, ''));
+                    }}
+                    className="w-full p-4 bg-primary/5 border border-primary/20 border-dashed rounded-xl text-sm font-bold text-primary hover:bg-primary/10 transition-all flex items-center justify-center gap-2"
+                  >
+                    <UserPlus size={18} />
+                    Cadastrar Novo Paciente
+                  </button>
+                )}
+
+                {/* Mini-formulário de cadastro rápido */}
+                {showMiniCadastro && (
+                  <div className="p-4 bg-white/[0.03] border border-white/10 rounded-xl space-y-3 animate-in slide-in-from-top duration-300">
+                    <p className="text-xs font-black text-primary uppercase tracking-widest flex items-center gap-2">
+                      <UserPlus size={14} />
+                      Cadastro Rápido
+                    </p>
+                    <input 
+                      type="text" 
+                      placeholder="Nome Completo *"
+                      className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-4 text-sm focus:outline-none focus:border-primary/50 transition-colors"
+                      value={novoNome}
+                      onChange={(e) => setNovoNome(e.target.value)}
+                    />
+                    <div className="grid grid-cols-2 gap-3">
+                      <input 
+                        type="text" 
+                        placeholder="CPF"
+                        className="bg-white/5 border border-white/10 rounded-xl py-2.5 px-4 text-sm focus:outline-none focus:border-primary/50 transition-colors"
+                        value={novoCpf}
+                        onChange={(e) => setNovoCpf(e.target.value)}
+                      />
+                      <input 
+                        type="text" 
+                        placeholder="WhatsApp (obrigatório) *"
+                        className="bg-white/5 border border-white/10 rounded-xl py-2.5 px-4 text-sm focus:outline-none focus:border-primary/50 transition-colors"
+                        value={novoWhatsapp}
+                        onChange={(e) => setNovoWhatsapp(e.target.value)}
+                      />
+                    </div>
+                    <input 
+                      type="date" 
+                      placeholder="Data de Nascimento"
+                      className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-4 text-sm focus:outline-none focus:border-primary/50 transition-colors text-white/60"
+                      value={novoNascimento}
+                      onChange={(e) => setNovoNascimento(e.target.value)}
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setShowMiniCadastro(false)}
+                        className="flex-1 py-2 rounded-xl text-sm font-bold text-white/40 hover:text-white bg-white/5 transition-colors"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        disabled={loading}
+                        onClick={handleCadastrarNovo}
+                        className="flex-1 py-2 rounded-xl text-sm font-black bg-primary text-black hover:shadow-lg hover:shadow-primary/20 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        {loading ? <Loader2 className="animate-spin" size={16} /> : <><UserPlus size={16} /> Cadastrar</>}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
+          {/* STEP 2: Data e Horário */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-xs font-bold text-white/20 uppercase tracking-widest ml-1">Data</label>
@@ -276,7 +519,7 @@ function AgendamentoModal({ isOpen, onClose }: { isOpen: boolean, onClose: () =>
             Cancelar
           </button>
           <button 
-            disabled={loading}
+            disabled={loading || !selectedClient}
             onClick={handleSave}
             className="bg-primary text-black px-8 py-2.5 rounded-xl text-sm font-black shadow-lg shadow-primary/20 hover:scale-105 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2"
           >

@@ -24,11 +24,16 @@ export const storage = {
   async saveClient(client: any) {
     if (isSupabaseConfigured()) {
       try {
-        const { data, error } = await supabase.from('clientes').insert([client]).select();
-        if (!error) {
-          console.log('Saved to Supabase');
-          return data;
-        }
+        // Mapear campos do frontend para o schema do banco
+        const row = {
+          nome_completo: client.nome_completo || client.name || '',
+          cpf: client.cpf || '',
+          whatsapp: (client.whatsapp || '').replace(/\D/g, ''),
+          data_nascimento: client.data_nascimento || null,
+          lis_score: client.lis_score || 850
+        };
+        const { data, error } = await supabase.from('clientes').insert([row]).select();
+        if (!error && data) return data[0];
         console.warn('Supabase insert error', error);
       } catch (e) {
         console.error('Supabase error, falling back to LocalStorage', e);
@@ -36,9 +41,14 @@ export const storage = {
     }
     
     // LocalStorage Fallback
-    console.log('Saving to LocalStorage (Fallback)');
     const clients = JSON.parse(localStorage.getItem('lis_clientes') || '[]');
-    const newClient = { ...client, id: Math.random().toString(36).substr(2, 9), criado_em: new Date().toISOString() };
+    const newClient = { 
+      ...client, 
+      id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9),
+      nome_completo: client.nome_completo || client.name || '',
+      whatsapp: (client.whatsapp || '').replace(/\D/g, ''),
+      criado_em: new Date().toISOString() 
+    };
     clients.push(newClient);
     localStorage.setItem('lis_clientes', JSON.stringify(clients));
     return newClient;
@@ -48,16 +58,118 @@ export const storage = {
     if (isSupabaseConfigured()) {
       try {
         const { data, error } = await supabase.from('clientes').select('*').order('criado_em', { ascending: false });
-        if (!error) return data;
+        if (!error && data) {
+          // Mapear nome_completo -> name para compatibilidade com componentes existentes
+          return data.map((c: any) => ({ ...c, name: c.nome_completo }));
+        }
         console.warn('Supabase select error', error);
       } catch (e) {
         console.error('Supabase fetch error, using LocalStorage', e);
       }
     }
-    console.log('Fetching from LocalStorage');
     return JSON.parse(localStorage.getItem('lis_clientes') || '[]');
   },
 
+  async getClientById(id: string) {
+    if (isSupabaseConfigured()) {
+      try {
+        const { data, error } = await supabase.from('clientes').select('*').eq('id', id).single();
+        if (!error && data) return { ...data, name: data.nome_completo };
+      } catch (e) {
+        console.warn('Supabase getClientById error', e);
+      }
+    }
+    const clients = JSON.parse(localStorage.getItem('lis_clientes') || '[]');
+    return clients.find((c: any) => c.id === id) || null;
+  },
+
+  // --- AGENDA / AGENDAMENTOS ---
+  async saveExame(exame: any) {
+    if (isSupabaseConfigured()) {
+      try {
+        const row = {
+          cliente_id: exame.cliente_id,
+          data: exame.data,
+          horario: exame.horario,
+          status: exame.status || 'AGENDADO',
+          observacao: exame.observacao || null
+        };
+        const { data, error } = await supabase.from('agendamentos').insert([row]).select(`
+          *,
+          clientes (id, nome_completo, cpf, whatsapp)
+        `);
+        if (!error && data) {
+          // Retornar no formato esperado pelo frontend
+          const ag = data[0];
+          return {
+            ...ag,
+            paciente_nome: ag.clientes?.nome_completo || '',
+            paciente_cpf: ag.clientes?.cpf || '',
+            paciente_whatsapp: ag.clientes?.whatsapp || ''
+          };
+        }
+        console.warn('Supabase agendamento insert error', error);
+      } catch (e) {
+        console.warn('Supabase error, falling back to LocalStorage', e);
+      }
+    }
+    // LocalStorage Fallback
+    const exames = JSON.parse(localStorage.getItem('lis_exames') || '[]');
+    const newExame = { 
+      ...exame, 
+      id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9), 
+      criado_em: new Date().toISOString() 
+    };
+    exames.push(newExame);
+    localStorage.setItem('lis_exames', JSON.stringify(exames));
+    return newExame;
+  },
+
+  async getExames() {
+    if (isSupabaseConfigured()) {
+      try {
+        const { data, error } = await supabase.from('agendamentos').select(`
+          *,
+          clientes (id, nome_completo, cpf, whatsapp)
+        `).order('data', { ascending: true });
+        if (!error && data) {
+          return data.map((ag: any) => ({
+            ...ag,
+            paciente_nome: ag.clientes?.nome_completo || '',
+            paciente_cpf: ag.clientes?.cpf || '',
+            paciente_whatsapp: ag.clientes?.whatsapp || ''
+          }));
+        }
+        console.warn('Supabase agendamentos select error', error);
+      } catch (e) {
+        console.warn('Supabase error, using LocalStorage', e);
+      }
+    }
+    return JSON.parse(localStorage.getItem('lis_exames') || '[]');
+  },
+
+  async updateExameStatus(id: string, status: string) {
+    if (isSupabaseConfigured()) {
+      try {
+        const { data, error } = await supabase
+          .from('agendamentos')
+          .update({ status })
+          .eq('id', id)
+          .select();
+        if (!error && data) return data[0];
+      } catch (e) {
+        console.warn('Supabase updateExameStatus error', e);
+      }
+    }
+    const exames = await this.getExames();
+    const index = exames.findIndex((e: any) => e.id === id);
+    if (index !== -1) {
+      exames[index].status = status;
+      localStorage.setItem('lis_exames', JSON.stringify(exames));
+      return exames[index];
+    }
+    return null;
+  },
   // --- VENDAS ---
   async saveSale(sale: any) {
     if (isSupabaseConfigured()) {
