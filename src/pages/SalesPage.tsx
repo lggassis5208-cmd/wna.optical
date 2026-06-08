@@ -263,7 +263,7 @@ export default function SalesPage() {
 
                                   // Abre a DANFE em nova aba
                                   if (result.danfe_url) {
-                                    window.open(result.danfe_url, '_blank');
+                                    SefazService.abrirDanfe(result.danfe_url);
                                   }
 
                                   fetchSales();
@@ -284,15 +284,13 @@ export default function SalesPage() {
                         ) : (
                           <>
                             {sale.danfe_url && (
-                              <a 
-                                href={sale.danfe_url} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
+                              <button 
+                                onClick={() => SefazService.abrirDanfe(sale.danfe_url)}
                                 className="p-2 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg transition-all border border-primary/20 flex items-center justify-center text-primary"
                                 title="Visualizar DANFE Oficial (PDF)"
                               >
                                 <ExternalLink size={18} />
-                              </a>
+                              </button>
                             )}
                             {sale.chave_acesso && (
                               <button 

@@ -133,15 +133,13 @@ export default function FiscalPage() {
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       {n.danfe_url && (
-                        <a 
-                          href={n.danfe_url} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
+                        <button 
+                          onClick={() => SefazService.abrirDanfe(n.danfe_url)}
                           className="p-2 bg-white/5 hover:bg-primary/20 hover:text-primary rounded-lg transition-all text-white/50"
                           title="Visualizar DANFE Oficial"
                         >
                           <ExternalLink size={18} />
-                        </a>
+                        </button>
                       )}
                       {n.xml && (
                         <button 
@@ -287,16 +285,14 @@ export default function FiscalPage() {
                   </button>
                 )}
                 {selectedNota.danfe_url && (
-                  <a 
-                    href={selectedNota.danfe_url} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
+                  <button 
+                    onClick={() => SefazService.abrirDanfe(selectedNota.danfe_url)}
                     className="px-4 py-2 bg-primary/10 hover:bg-primary/20 text-primary rounded-xl text-sm font-bold border border-primary/20 transition-all flex items-center gap-2"
                     title="Visualizar DANFE"
                   >
                     <ExternalLink size={16} />
                     DANFE Oficial
-                  </a>
+                  </button>
                 )}
                 <button 
                   onClick={() => window.print()}

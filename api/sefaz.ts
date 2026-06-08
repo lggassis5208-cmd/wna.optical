@@ -118,7 +118,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 function gerarXMLNfe(sale: any, settings: any, modelo: string) {
   const mod = modelo || '55';
   const serie = '001';
-  const numero = Math.floor(Math.random() * 900000 + 100000).toString();
+  const numero = Math.floor(Math.random() * 900000000 + 100000000).toString();
   const cnpj = (settings?.empresa?.cnpj || '39156577000122').replace(/\D/g, '');
   const dataAnoMes = new Date().toISOString().slice(2, 7).replace('-', '');
   

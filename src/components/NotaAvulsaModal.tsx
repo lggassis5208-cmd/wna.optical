@@ -143,7 +143,7 @@ export default function NotaAvulsaModal({ isOpen, onClose }: NotaAvulsaModalProp
 
         // Abre automaticamente em uma nova aba o PDF do DANFE oficial gerado pela API/governo
         if (result.danfe_url) {
-          window.open(result.danfe_url, '_blank');
+          SefazService.abrirDanfe(result.danfe_url);
         }
 
         toast.success('Nota Fiscal Avulsa emitida com sucesso!');
@@ -201,15 +201,13 @@ export default function NotaAvulsaModal({ isOpen, onClose }: NotaAvulsaModalProp
               {danfeUrl && (
                 <div className="flex flex-col items-center gap-3">
                   <div className="flex flex-wrap justify-center gap-3">
-                    <a
-                      href={danfeUrl}
-                      target="_blank"
-                      rel="noreferrer"
+                    <button
+                      onClick={() => SefazService.abrirDanfe(danfeUrl)}
                       className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-black font-black rounded-xl hover:scale-105 transition-all text-sm shadow-lg shadow-primary/10"
                     >
                       <ExternalLink size={16} />
                       Ver DANFE Oficial
-                    </a>
+                    </button>
                     {notaInfo?.xml && (
                       <button
                         onClick={() => SefazService.baixarXML(notaInfo.chave, notaInfo.xml)}

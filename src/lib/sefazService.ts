@@ -184,7 +184,7 @@ export const SefazService = {
         if (response.status === 200 || response.status === 201 || response.status === 202) {
           let status = data.status;
           let chave = data.chave_nfe;
-          let danfe = data.caminho_pdf_danfe;
+          let danfe = data.caminho_danfe || data.caminho_pdf_danfe;
           let xmlUrl = data.caminho_xml_nota_fiscal;
           let protocolo = data.protocolo_autorizacao;
 
@@ -202,7 +202,7 @@ export const SefazService = {
                 if (checkData.status !== 'processando') {
                   status = checkData.status;
                   chave = checkData.chave_nfe || chave;
-                  danfe = checkData.caminho_pdf_danfe || danfe;
+                  danfe = checkData.caminho_danfe || checkData.caminho_pdf_danfe || danfe;
                   xmlUrl = checkData.caminho_xml_nota_fiscal || xmlUrl;
                   protocolo = checkData.protocolo_autorizacao || protocolo;
                   break;
@@ -222,11 +222,24 @@ export const SefazService = {
               }
             }
 
+            const host = settings.fiscal?.ambiente === 'producao'
+              ? 'https://api.focusnfe.com.br'
+              : 'https://homologacao.focusnfe.com.br';
+
+            let danfeUrlResolved = '';
+            if (danfe) {
+              danfeUrlResolved = danfe.startsWith('/') ? `${host}${danfe}` : danfe;
+            } else if (chave && chave.length === 44) {
+              danfeUrlResolved = `${baseUrl}/${mod}/${ref}/danfe?token=${token}`;
+            } else {
+              danfeUrlResolved = `${host}/v2/${mod}/${ref}/danfe?token=${token}`;
+            }
+
             return {
               sucesso: true,
               status: 'autorizada',
               chave_acesso: chave,
-              danfe_url: danfe || `https://visualizador.focusnfe.com.br/danfe/${chave}`,
+              danfe_url: danfeUrlResolved,
               protocolo,
               xml: xmlContent || `<?xml version="1.0" encoding="UTF-8"?><nfeProc xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00"><NFe><infNFe Id="NFe${chave}" versao="4.00"></infNFe></NFe><protNFe versao="4.00"><infProt><chNFe>${chave}</chNFe><nProt>${protocolo}</nProt><cStat>100</cStat><xMotivo>Autorizado o uso da NF-e / NFC-e</xMotivo></infProt></protNFe></nfeProc>`
             };
@@ -339,7 +352,7 @@ export const SefazService = {
     const cnpj = payload.cnpj_emitente.replace(/\D/g, '');
     const mod = '65'; // NFC-e
     const serie = '001';
-    const numero = Math.floor(Math.random() * 900000 + 100000).toString();
+    const numero = Math.floor(Math.random() * 900000000 + 100000000).toString();
     const tipoEmissao = '1';
     const codigoNum = Math.floor(Math.random() * 90000000 + 10000000).toString();
     
@@ -351,7 +364,8 @@ export const SefazService = {
     const chaveAcesso = `${chaveParcial}${dv}`;
 
     // Link simulado de visualização do DANFE
-    const danfeUrl = `https://visualizador.focusnfe.com.br/danfe/${chaveAcesso}`;
+    const host = settings.fiscal?.ambiente === 'producao' ? 'https://api.focusnfe.com.br' : 'https://homologacao.focusnfe.com.br';
+    const danfeUrl = `${host}/v2/nfe/simulado_danfe_${chaveAcesso}`;
     const protocolo = `15226${Math.floor(Math.random() * 900000 + 100000)}`;
     const dhEmi = new Date().toISOString();
 
@@ -518,5 +532,45 @@ export const SefazService = {
     link.href = URL.createObjectURL(blob);
     link.download = `NFe-${chaveAcesso}.xml`;
     link.click();
+  },
+
+  async abrirDanfe(danfeUrl: string) {
+    if (!danfeUrl) {
+      alert('URL do DANFE não disponível ou vazia.');
+      return;
+    }
+
+    // 1. Validar chave de acesso se estiver presente na URL
+    const chaveMatch = danfeUrl.match(/\d{40,}/);
+    if (chaveMatch) {
+      const chave = chaveMatch[0];
+      if (chave.length !== 44) {
+        alert(`Erro: A chave de acesso fiscal extraída da URL está incompleta (${chave.length} dígitos em vez de 44). O link não pode ser carregado.`);
+        return;
+      }
+    }
+
+    // 2. Tratar host inválido legado
+    if (danfeUrl.includes('visualizador.focusnfe.com.br')) {
+      alert('Erro: O servidor de visualização legado (visualizador.focusnfe.com.br) está inativo. Por favor, consulte utilizando a chave de acesso no portal oficial da SEFAZ.');
+      return;
+    }
+
+    // 3. Obter URL real se for redirect 302 da Focus NFe para a URL pré-assinada
+    if (danfeUrl.includes('focusnfe.com.br') && danfeUrl.includes('/danfe')) {
+      try {
+        const response = await fetch(danfeUrl, {
+          method: 'GET'
+        });
+        if (response.ok && response.url && response.url !== danfeUrl) {
+          window.open(response.url, '_blank');
+          return;
+        }
+      } catch (err) {
+        console.warn('Erro ao resolver redirecionamento 302 da Focus NFe no cliente:', err);
+      }
+    }
+
+    window.open(danfeUrl, '_blank');
   }
 };
