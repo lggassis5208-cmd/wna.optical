@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import PrintNFe, { NotaFiscalData } from "./PrintNFe";
+import PrintNFe from "./PrintNFe";
+import type { NotaFiscalData } from "./PrintNFe";
 
 /**
  * SimularImpressaoNota.tsx
