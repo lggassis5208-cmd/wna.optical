@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @media print {
+      @page { size: A4 portrait; margin: 5mm; }
+      body { 
+        -webkit-print-color-adjust: exact; 
+        print-color-adjust: exact; 
+        background: white !important; 
+        margin: 0;
+      }
+      .print-nfe-container {
+        display: block !important;
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: auto;
+        background: white !important;
+        z-index: 999999;
+      }
+    }
+  </style>
+</head>
+<body class="bg-gray-200 p-4">
+  <div class="print-nfe-container bg-white text-black font-sans text-[10px] w-[190mm] mx-auto border border-black p-1">
+    
+    {/* CABEÇALHO DANFE */}
+    <div class="flex border border-black mb-1">
+      {/* Quadro 1: Emitente */}
+      <div class="w-[45%] border-r border-black p-2 flex flex-col justify-center">
+        <h1 class="font-bold text-sm uppercase text-center">ÓTICA LÌS</h1>
+        <p class="text-center mt-1">Avenida Anápolis Qd 03 Lt 01, Nº 2134, Vila Concórdia</p>
+        <p class="text-center">GOIÂNIA - GO | Fone: (62) 9999-9999</p>
+      </div>
+      
+      {/* Quadro 2: Título DANFE */}
+      <div class="w-[15%] border-r border-black p-2 flex flex-col items-center justify-center text-center">
+        <h2 class="font-bold text-lg leading-none">DANFE</h2>
+        <p class="text-[8px] mt-1">Documento Auxiliar da Nota Fiscal Eletrônica</p>
+        <div class="mt-2 text-left w-full text-[8px]">
+          <p>0 - Entrada</p>
+          <p>1 - Saída <span class="float-right border border-black px-1 font-bold">1</span></p>
+        </div>
+        <p class="mt-2 font-bold text-xs">Nº 000.001.234</p>
+        <p class="font-bold text-xs">SÉRIE: 1</p>
+        <p class="text-[8px]">Página 1 de 1</p>
+      </div>
+
+      {/* Quadro 3: Código de Barras */}
+      <div class="w-[40%] p-2 flex flex-col justify-between">
+        <div>
+           <p class="uppercase font-bold text-[8px] mb-1">Controle do Fisco</p>
+           <div class="h-10 w-full border border-gray-300 flex items-center justify-center bg-gray-100">
+              <span class="font-mono text-xs tracking-widest font-bold">||||| | |||| |||| || | || ||||| |</span>
+           </div>
+        </div>
+        <div class="mt-2">
+           <p class="uppercase text-[8px]">Chave de Acesso</p>
+           <p class="font-mono text-xs font-bold">5226 0639 1565 7700 0122 5500 1000 0001 2315 2260 0001</p>
+        </div>
+        <div class="mt-2 text-center text-[8px] leading-tight">
+           Consulta de autenticidade no portal nacional da NF-e www.nfe.fazenda.gov.br/portal ou no site da Sefaz Autorizadora
+        </div>
+      </div>
+    </div>
+
+    {/* NATUREZA DA OPERAÇÃO */}
+    <div class="flex border border-black mb-1">
+      <div class="w-[60%] border-r border-black p-1">
+        <p class="uppercase text-[7px]">Natureza da Operação</p>
+        <p class="font-bold">VENDA DE MERCADORIA</p>
+      </div>
+      <div class="w-[40%] p-1">
+        <p class="uppercase text-[7px]">Protocolo de Autorização de Uso</p>
+        <p class="font-bold">152260000123456 - 08/06/2026 20:30:00</p>
+      </div>
+    </div>
+
+    {/* INSCRIÇÕES */}
+    <div class="flex border border-black mb-2">
+      <div class="w-[33.3%] border-r border-black p-1">
+         <p class="uppercase text-[7px]">Inscrição Estadual</p>
+         <p class="font-bold">10.784.952-1</p>
+      </div>
+      <div class="w-[33.3%] border-r border-black p-1">
+         <p class="uppercase text-[7px]">Inscr. Estadual do Subst. Trib.</p>
+         <p class="font-bold"></p>
+      </div>
+      <div class="w-[33.3%] p-1">
+         <p class="uppercase text-[7px]">CNPJ</p>
+         <p class="font-bold">39.156.577/0001-22</p>
+      </div>
+    </div>
+
+    {/* DESTINATÁRIO */}
+    <p class="font-bold text-[9px] mb-0.5 uppercase">Destinatário / Remetente</p>
+    <div class="border border-black mb-2">
+      <div class="flex border-b border-black">
+         <div class="w-[60%] border-r border-black p-1">
+            <p class="uppercase text-[7px]">Nome / Razão Social</p>
+            <p class="font-bold truncate">JOÃO DA SILVA</p>
+         </div>
+         <div class="w-[25%] border-r border-black p-1">
+            <p class="uppercase text-[7px]">CNPJ/CPF</p>
+            <p class="font-bold">123.456.789-00</p>
+         </div>
+         <div class="w-[15%] p-1">
+            <p class="uppercase text-[7px]">Data da Emissão</p>
+            <p class="font-bold">08/06/2026</p>
+         </div>
+      </div>
+      <div class="flex">
+          <div class="w-[45%] border-r border-black p-1">
+            <p class="uppercase text-[7px]">Endereço</p>
+            <p class="font-bold truncate">Rua das Laranjeiras, 123</p>
+         </div>
+         <div class="w-[25%] border-r border-black p-1">
+            <p class="uppercase text-[7px]">Bairro/Distrito</p>
+            <p class="font-bold truncate">Setor Oeste</p>
+         </div>
+         <div class="w-[10%] border-r border-black p-1">
+            <p class="uppercase text-[7px]">CEP</p>
+            <p class="font-bold">74123-456</p>
+         </div>
+         <div class="w-[20%] p-1">
+            <p class="uppercase text-[7px]">Data Saída/Entrada</p>
+            <p class="font-bold">08/06/2026</p>
+         </div>
+      </div>
+    </div>
+
+
+
+    {/* CÁLCULO DO IMPOSTO */}
+    <p class="font-bold text-[9px] mb-0.5 uppercase">Cálculo do Imposto</p>
+    <div class="border border-black mb-2 flex bg-white text-[8px]">
+       <div class="flex-1 border-r border-black p-1">
+          <p class="uppercase text-[6px]">Base Cálculo ICMS</p>
+          <p class="font-bold text-right">0,00</p>
+       </div>
+       <div class="flex-1 border-r border-black p-1">
+          <p class="uppercase text-[6px]">Valor do ICMS</p>
+          <p class="font-bold text-right">0,00</p>
+       </div>
+       <div class="flex-1 border-r border-black p-1">
+          <p class="uppercase text-[6px]">Base Cálculo ICMS ST</p>
+          <p class="font-bold text-right">0,00</p>
+       </div>
+       <div class="flex-1 border-r border-black p-1">
+          <p class="uppercase text-[6px]">Valor do ICMS ST</p>
+          <p class="font-bold text-right">0,00</p>
+       </div>
+       <div class="flex-1 p-1">
+          <p class="uppercase text-[6px]">Valor Total dos Produtos</p>
+          <p class="font-bold text-right">1.500,00</p>
+       </div>
+    </div>
+
+    {/* DADOS DOS PRODUTOS */}
+    <p class="font-bold text-[9px] mb-0.5 uppercase">Dados do Produto/Serviço</p>
+    <div class="border border-black min-h-[50mm] mb-2 bg-white">
+      <table class="w-full text-[8px]">
+        <thead>
+          <tr class="border-b border-black bg-gray-50 font-bold">
+            <th class="border-r border-black p-1 text-left">CÓD. PROD.</th>
+            <th class="border-r border-black p-1 text-left">DESCRIÇÃO DO PROD./SERV.</th>
+            <th class="border-r border-black p-1">NCM/SH</th>
+            <th class="border-r border-black p-1">CST</th>
+            <th class="border-r border-black p-1">CFOP</th>
+            <th class="border-r border-black p-1">UNID.</th>
+            <th class="border-r border-black p-1">QUANT.</th>
+            <th class="border-r border-black p-1">V. UNIT.</th>
+            <th class="p-1">V. TOTAL</th>
+          </tr>
+        </thead>
+        <tbody>
+           <tr class="border-b border-gray-200">
+              <td class="border-r border-black p-1">001</td>
+              <td class="border-r border-black p-1">LENTE VARILUX LIBERTY ORMA C/ CRIZAL EASY</td>
+              <td class="border-r border-black p-1 text-center">90031100</td>
+              <td class="border-r border-black p-1 text-center">0102</td>
+              <td class="border-r border-black p-1 text-center">5102</td>
+              <td class="border-r border-black p-1 text-center">UN</td>
+              <td class="border-r border-black p-1 text-right">1.00</td>
+              <td class="border-r border-black p-1 text-right">850,00</td>
+              <td class="p-1 text-right">850,00</td>
+           </tr>
+           <tr>
+              <td class="border-r border-black p-1">002</td>
+              <td class="border-r border-black p-1">ARMAÇÃO RAY-BAN RX7140</td>
+              <td class="border-r border-black p-1 text-center">90031100</td>
+              <td class="border-r border-black p-1 text-center">0102</td>
+              <td class="border-r border-black p-1 text-center">5102</td>
+              <td class="border-r border-black p-1 text-center">UN</td>
+              <td class="border-r border-black p-1 text-right">1.00</td>
+              <td class="border-r border-black p-1 text-right">650,00</td>
+              <td class="p-1 text-right">650,00</td>
+           </tr>
+        </tbody>
+      </table>
+    </div>
+
+    {/* DADOS ADICIONAIS */}
+    <p class="font-bold text-[9px] mb-0.5 uppercase">Dados Adicionais</p>
+    <div class="border border-black flex min-h-[20mm] bg-white">
+       <div class="w-[60%] border-r border-black p-1">
+          <p class="uppercase text-[7px] font-bold">Informações Complementares</p>
+          <p class="text-[8px] mt-1">
+            DOCUMENTO EMITIDO POR ME OU EPP OPTANTE PELO SIMPLES NACIONAL. 
+            NÃO GERA DIREITO A CRÉDITO FISCAL DE IPI. 
+            O.S. REFERÊNCIA: OS-2026-0001
+          </p>
+       </div>
+       <div class="w-[40%] p-1">
+          <p class="uppercase text-[7px] font-bold">Reservado ao Fisco</p>
+       </div>
+    </div>
+
+  </div>
+</body>
+</html>

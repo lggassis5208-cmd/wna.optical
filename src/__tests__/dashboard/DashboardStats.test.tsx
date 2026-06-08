@@ -30,6 +30,8 @@ vi.mock('../../lib/storage', () => ({
       { valor_total: 500, criado_em: new Date().toISOString() },
     ]),
     getClients: vi.fn().mockResolvedValue([]),
+    getProducts: vi.fn().mockResolvedValue([]),
+    seedDemoProducts: vi.fn().mockResolvedValue(undefined),
     getCaixaAtual: vi.fn().mockResolvedValue({ status: 'ABERTO' }),
   }
 }));

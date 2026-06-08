@@ -45,7 +45,7 @@ describe('PrintNFe Component', () => {
     // Como o PrintNFe soma os itens de acordo com nossa refatoração
     // Deve haver o valor total de 1500 na seção de total dos produtos
     // formatado como 1500,00
-    const valorFormatado = (1500).toFixed(2).replace('.', ',');
+    const valorFormatado = (1500).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     
     // Pegar o Total do rodapé ou do cálculo de impostos
     // Há mais de um "1500,00" (ex. na base de ICMS e total)

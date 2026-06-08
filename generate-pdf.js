@@ -1,0 +1,152 @@
+import puppeteer from 'puppeteer';
+import fs from 'fs';
+import path from 'path';
+
+const htmlContent = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @media print {
+      @page { size: auto; margin: 0mm; }
+      body { 
+        -webkit-print-color-adjust: exact; 
+        print-color-adjust: exact; 
+        background: white !important; 
+        margin: 0;
+      }
+      .print-nfce-container {
+        display: flex !important;
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: auto;
+        background: white !important;
+        z-index: 999999;
+        justify-content: center;
+        padding-top: 10px;
+      }
+    }
+  </style>
+</head>
+<body class="bg-gray-200">
+  <div class="print-nfce-container flex bg-white text-black font-sans text-[12px] w-full min-h-screen justify-center pt-2">
+    <div class="w-[80mm] border border-dashed border-gray-400 p-2 mx-auto">
+        <div class="text-center font-bold mb-2">
+           <h1 class="text-sm uppercase">ÓTICA LÌS</h1>
+           <p class="text-[10px] font-normal mt-1">CNPJ: 39.156.577/0001-22</p>
+           <p class="text-[10px] font-normal">Avenida Anápolis Qd 03 Lt 01, Nº 2134, Vila Concórdia</p>
+           <p class="text-[10px] font-normal">Documento Auxiliar da Nota Fiscal de Consumidor Eletrônica</p>
+        </div>
+
+        <div class="border-t border-b border-dashed border-black py-2 my-2 text-[10px]">
+           <table class="w-full text-left">
+             <thead>
+               <tr>
+                 <th class="pb-1 w-10">Cód.</th>
+                 <th class="pb-1">Desc.</th>
+                 <th class="pb-1 text-right w-6">Qtd</th>
+                 <th class="pb-1 text-right w-12">Vl.Un</th>
+                 <th class="pb-1 text-right w-12">Vl.Tot</th>
+               </tr>
+             </thead>
+             <tbody>
+                 <tr>
+                   <td class="align-top py-0.5">001</td>
+                   <td class="align-top py-0.5">LENTE VISÃO SIMPLES C/ ANTIRREFLEXO</td>
+                   <td class="text-right align-top py-0.5">1</td>
+                   <td class="text-right align-top py-0.5">350.00</td>
+                   <td class="text-right align-top py-0.5">350.00</td>
+                 </tr>
+             </tbody>
+           </table>
+        </div>
+
+        <div class="text-[12px] font-bold">
+           <div class="flex justify-between">
+              <span>Qtd Total de Itens</span>
+              <span>1</span>
+           </div>
+           <div class="flex justify-between mt-1 text-sm">
+              <span>VALOR TOTAL R$</span>
+              <span>350,00</span>
+           </div>
+           <div class="flex justify-between mt-1 text-[10px] font-normal">
+              <span>Forma de Pagamento</span>
+              <span>Valor Pago R$</span>
+           </div>
+           <div class="flex justify-between text-[11px]">
+              <span>Cartão de Crédito</span>
+              <span>350,00</span>
+           </div>
+        </div>
+
+        <div class="text-center text-[10px] border-t border-dashed border-black pt-2 mt-2">
+           <p>Consulte pela Chave de Acesso em</p>
+           <p class="underline">http://nfe.sefaz.go.gov.br/nfeweb/sites/nfce/danfeNFCe</p>
+           <p class="font-bold my-2 font-mono tracking-widest break-words">5226 0539 1565 7700 0122 6500 1123 4561 1234 5678</p>
+        </div>
+
+        <div class="flex justify-center my-4">
+             <div class="w-[120px] h-[120px] bg-gray-200 border flex items-center justify-center text-[10px] text-center">
+               QR Code<br/>NFC-e
+             </div>
+        </div>
+
+        <div class="text-center text-[9px] mt-2 border-t border-dashed border-black pt-2">
+           <p><strong>CONSUMIDOR CPF:</strong> 123.456.789-00</p>
+           <p>LUCAS GASSIS</p>
+           <p class="mt-2 font-bold">NFC-e nº 000123 Série 1</p>
+           <p>Data de Emissão: 08/06/2026 20:25:00</p>
+           <p>Protocolo de Autorização: 152260000000000</p>
+        </div>
+      </div>
+  </div>
+</body>
+</html>
+`;
+
+(async () => {
+  // 1. Salva o HTML de teste do NFCe
+  fs.writeFileSync('danfe-test.html', htmlContent);
+  
+  // Inicia o Puppeteer
+  const browser = await puppeteer.launch();
+  const page = await browser.newPage();
+  
+  // Caminho da pasta de artefatos desta sessão
+  const artifactDir = 'C:/Users/Lucas/.gemini/antigravity-ide/brain/a21edef3-5a3d-42a0-95c5-4ac594cb4de4';
+  
+  // Garante que a pasta de artefatos existe
+  if (!fs.existsSync(artifactDir)){
+    fs.mkdirSync(artifactDir, { recursive: true });
+  }
+
+  // 1. Gerar PDF do NFC-e (Cupom)
+  const nfceUrl = 'file:///' + path.resolve('danfe-test.html').replace(/\\/g, '/');
+  await page.goto(nfceUrl, { waitUntil: 'networkidle0' });
+  const nfcePdfPath = path.join(artifactDir, 'DANFE_NFCe_Teste.pdf');
+  await page.pdf({ 
+    path: nfcePdfPath, 
+    format: 'A4',
+    printBackground: true 
+  });
+  console.log('PDF do NFC-e gerado com sucesso em:', nfcePdfPath);
+
+  // 2. Gerar PDF do NFe (Nota Grande A4)
+  const nfeUrl = 'file:///' + path.resolve('nfe-test.html').replace(/\\/g, '/');
+  await page.goto(nfeUrl, { waitUntil: 'networkidle0' });
+  const nfePdfPath = path.join(artifactDir, 'DANFE_NFe_Teste.pdf');
+  await page.pdf({ 
+    path: nfePdfPath, 
+    format: 'A4',
+    printBackground: true 
+  });
+  console.log('PDF do NFe gerado com sucesso em:', nfePdfPath);
+
+  await browser.close();
+  console.log('Todos os PDFs gerados com sucesso!');
+})();
