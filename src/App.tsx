@@ -31,6 +31,7 @@ import SettingsPage from './pages/SettingsPage';
 import LoginPage from './pages/LoginPage';
 import TestAutomatedPage from './pages/TestAutomatedPage';
 import ProtectedRoute from './components/ProtectedRoute';
+import SimularImpressaoNota from './components/SimularImpressaoNota';
 import { notificationService } from './lib/notificationService';
 import type { AppNotification } from './lib/notificationService';
 import { openWhatsApp } from './lib/whatsappUtils';
@@ -290,6 +291,9 @@ function App() {
     <Router>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        {import.meta.env.DEV && (
+          <Route path="/dev/print-test" element={<SimularImpressaoNota />} />
+        )}
         <Route 
           path="/" 
           element={

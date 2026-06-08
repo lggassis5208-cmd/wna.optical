@@ -14,12 +14,14 @@ import {
 import { toast } from 'sonner';
 import { storage } from '../lib/storage';
 import { SefazService } from '../lib/sefazService';
+import NotaAvulsaModal from '../components/NotaAvulsaModal';
 
 export default function FiscalPage() {
   const [notas, setNotas] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedNota, setSelectedNota] = useState<any>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isAvulsaOpen, setIsAvulsaOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -62,7 +64,10 @@ export default function FiscalPage() {
           <h2 className="text-3xl font-black text-white">Notas <span className="text-primary italic">Fiscais</span></h2>
           <p className="text-white/40 text-sm italic">Gestão de Documentos Fiscais Eletrônicos</p>
         </div>
-        <button className="bg-primary text-black font-black px-6 py-2.5 rounded-xl flex items-center gap-2 hover:shadow-lg hover:shadow-primary/20 transition-all active:scale-95">
+        <button 
+          onClick={() => setIsAvulsaOpen(true)}
+          className="bg-primary text-black font-black px-6 py-2.5 rounded-xl flex items-center gap-2 hover:shadow-lg hover:shadow-primary/20 transition-all active:scale-95"
+        >
           <Plus size={20} />
           Nova Nota Avulsa
         </button>
@@ -305,6 +310,14 @@ export default function FiscalPage() {
           </div>
         </div>
       )}
+
+      <NotaAvulsaModal 
+        isOpen={isAvulsaOpen} 
+        onClose={() => {
+          setIsAvulsaOpen(false);
+          fetchNotas();
+        }} 
+      />
     </div>
   );
 }
