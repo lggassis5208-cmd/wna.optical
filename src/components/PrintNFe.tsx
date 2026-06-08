@@ -39,12 +39,28 @@ export default function PrintNFe({ sale, settings, chaveAcesso, protocolo }: Pri
   const totalGeral = items.reduce((acc: number, item: any) => acc + Number(item.vTot || 0), 0);
 
   return (
-    <div className="hidden print:block absolute inset-0 bg-white text-black font-sans text-[10px] w-full min-h-screen">
+    <div className="print-nfe-container hidden print:block absolute inset-0 bg-white text-black font-sans text-[10px] w-full min-h-screen">
       <style>
         {`
           @media print {
             @page { size: A4 portrait; margin: 5mm; }
-            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: white !important; }
+            body { 
+              -webkit-print-color-adjust: exact; 
+              print-color-adjust: exact; 
+              background: white !important; 
+              margin: 0;
+            }
+            .print-nfe-container {
+              display: block !important;
+              position: absolute;
+              left: 0;
+              top: 0;
+              width: 100%;
+              height: auto;
+              background: white !important;
+              z-index: 999999;
+            }
+            #root > :not(.print-nfe-container) { display: none !important; }
             * { box-sizing: border-box; }
           }
         `}

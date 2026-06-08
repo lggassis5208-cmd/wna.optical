@@ -37,19 +37,37 @@ export default function PrintNFCe({ sale, settings, chaveAcesso, protocolo }: Pr
   const totalQtd = items.reduce((acc: number, item: any) => acc + Number(item.qtd || 1), 0);
 
   return (
-    <div className="hidden print:flex absolute inset-0 bg-white text-black font-sans text-[12px] w-full min-h-screen justify-center pt-10">
+    <div className="print-nfce-container hidden print:flex bg-white text-black font-sans text-[12px] w-full min-h-screen justify-center pt-2">
       <style>
         {`
           @media print {
-            @page { size: A4 portrait; margin: 10mm; }
-            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: white !important; }
+            @page { size: auto; margin: 0mm; }
+            body { 
+              -webkit-print-color-adjust: exact; 
+              print-color-adjust: exact; 
+              background: white !important; 
+              margin: 0;
+            }
+            .print-nfce-container {
+              display: flex !important;
+              position: absolute;
+              left: 0;
+              top: 0;
+              width: 100%;
+              height: auto;
+              background: white !important;
+              z-index: 999999;
+              justify-content: center;
+              padding-top: 10px;
+            }
+            #root > :not(.print-nfce-container) { display: none !important; }
             * { box-sizing: border-box; }
           }
         `}
       </style>
 
-      {/* Container simulando a bobina, mas dentro do A4 (ex: 80mm de largura ou um pouco mais para leitura no A4) */}
-      <div className="w-[100mm] border border-dashed border-gray-400 p-4">
+      {/* Container simulando a bobina */}
+      <div className="w-[80mm] border border-dashed border-gray-400 p-2 mx-auto">
         <div className="text-center font-bold mb-2">
            <h1 className="text-sm uppercase">{settings?.empresa?.nome_fantasia || 'ÓTICA LÌS'}</h1>
            <p className="text-[10px] font-normal mt-1">CNPJ: {settings?.empresa?.cnpj || '39.156.577/0001-22'}</p>
@@ -61,11 +79,11 @@ export default function PrintNFCe({ sale, settings, chaveAcesso, protocolo }: Pr
            <table className="w-full text-left">
              <thead>
                <tr>
-                 <th className="pb-1 w-12">Cód.</th>
-                 <th className="pb-1">Descrição</th>
-                 <th className="pb-1 text-right w-12">Qtd</th>
-                 <th className="pb-1 text-right w-16">Vl.Un</th>
-                 <th className="pb-1 text-right w-16">Vl.Tot</th>
+                 <th className="pb-1 w-10">Cód.</th>
+                 <th className="pb-1">Desc.</th>
+                 <th className="pb-1 text-right w-6">Qtd</th>
+                 <th className="pb-1 text-right w-12">Vl.Un</th>
+                 <th className="pb-1 text-right w-12">Vl.Tot</th>
                </tr>
              </thead>
              <tbody>
