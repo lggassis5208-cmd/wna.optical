@@ -91,12 +91,9 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
           await storage.atualizarVendaFiscal(sale.id, result.chave_acesso, result.danfe_url || '');
         }
 
-        // Abre automaticamente em uma nova aba o PDF do DANFE oficial gerado pela API/governo
-        if (result.danfe_url) {
-          // Aqui não abrimos em nova aba. Em vez disso, mudamos o estado para imprimir nosso componente interno A4.
-          setTipoImpressaoFisco(modelo);
-          setTimeout(() => window.print(), 800);
-        }
+        // Aqui não abrimos em nova aba. Em vez disso, mudamos o estado para imprimir nosso componente interno A4/Bobina.
+        setTipoImpressaoFisco(modelo);
+        setTimeout(() => window.print(), 800);
 
         toast.success('Nota Fiscal emitida com sucesso!', {
           description: `Chave de Acesso vinculada à venda.`

@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { SefazService } from '../lib/sefazService';
 import { storage } from '../lib/storage';
 import PrintNFe from './PrintNFe';
+import PrintNFCe from './PrintNFCe';
 
 interface NotaAvulsaModalProps {
   isOpen: boolean;
@@ -407,45 +408,52 @@ export default function NotaAvulsaModal({ isOpen, onClose }: NotaAvulsaModalProp
       </div>
 
       {success && settings && tipoImpressaoFisco && (
-        <PrintNFe 
-          data={{
-            tipo: cpfCnpj.replace(/\D/g, '').length === 14 ? 'nfe' : 'nfce',
-            numero: '000.000.123',
-            serie: '001',
-            chaveAcesso: notaInfo?.chave || '',
-            protocolo: '152260000000000',
-            dataEmissao: new Date().toLocaleDateString('pt-BR'),
-            emitente: {
-              razaoSocial: settings?.empresa?.nome_fantasia || 'ÓTICA LÌS',
-              cnpj: settings?.empresa?.cnpj || '39.156.577/0001-22',
-              endereco: settings?.empresa?.endereco || 'Av. Goiás, 1234 - Centro',
-              cidade: settings?.empresa?.cidade || 'Goiânia',
-              uf: settings?.empresa?.uf || 'GO',
-            },
-            destinatario: {
-              nome: nome,
-              cpfCnpj: cpfCnpj,
-              endereco: 'Não Informado',
-              bairro: 'Não Informado',
-              cep: '00000-000',
-            },
-            produtos: itens.map((item, idx) => ({
-              codigo: String(idx + 1).padStart(3, '0'),
-              descricao: item.descricao,
-              ncm: item.ncm,
-              cfop: '5102',
-              quantidade: item.quantidade,
-              valorUnitario: item.valor_unitario,
-              valorTotal: item.quantidade * item.valor_unitario,
-            })),
-            impostos: {
-              totalProdutos: totalNota,
-              desconto: 0,
-              totalNota: totalNota,
-            }
-          }} 
-          tipo={tipoImpressaoFisco === '55' ? 'nfe' : 'nfce'} 
-        />
+        tipoImpressaoFisco === '55' ? (
+          <PrintNFe 
+            sale={{
+              paciente_nome: nome,
+              paciente_cpf: cpfCnpj,
+              cliente_endereco: 'Não Informado',
+              cliente_bairro: 'Não Informado',
+              cliente_cep: '00000-000',
+              valor_total: totalNota,
+              criado_em: new Date().toISOString(),
+              forma_pagamento: 'Dinheiro',
+              itens: itens.map((item, idx) => ({
+                id: String(idx + 1).padStart(3, '0'),
+                nome: item.descricao,
+                ncm: item.ncm,
+                qtd: item.quantidade,
+                vUn: item.valor_unitario,
+                vTot: item.quantidade * item.valor_unitario,
+              }))
+            }}
+            settings={settings}
+            chaveAcesso={notaInfo?.chave || ''}
+            protocolo={notaInfo?.protocolo || ''}
+          />
+        ) : (
+          <PrintNFCe 
+            sale={{
+              paciente_nome: nome,
+              paciente_cpf: cpfCnpj,
+              valor_total: totalNota,
+              criado_em: new Date().toISOString(),
+              forma_pagamento: 'Dinheiro',
+              itens: itens.map((item, idx) => ({
+                id: String(idx + 1).padStart(3, '0'),
+                nome: item.descricao,
+                ncm: item.ncm,
+                qtd: item.quantidade,
+                vUn: item.valor_unitario,
+                vTot: item.quantidade * item.valor_unitario,
+              }))
+            }}
+            settings={settings}
+            chaveAcesso={notaInfo?.chave || ''}
+            protocolo={notaInfo?.protocolo || ''}
+          />
+        )
       )}
     </div>
   );
