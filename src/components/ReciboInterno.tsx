@@ -69,7 +69,8 @@ export default function ReciboInterno({ data }: ReciboInternoProps) {
     <div
       className="recibo-interno-container"
       style={{
-        width: "190mm",
+        width: "100%",
+        maxWidth: "190mm",
         minHeight: "272mm",
         backgroundColor: "#ffffff",
         border: "3px solid #2d3142",

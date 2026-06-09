@@ -302,7 +302,7 @@ export default function PrintNFe({
           }
 
           @media print {
-            @page { size: auto; margin: 5mm; }
+            @page { size: A4 portrait; margin: 10mm; }
             body { 
               -webkit-print-color-adjust: exact; 
               print-color-adjust: exact; 
@@ -329,11 +329,39 @@ export default function PrintNFe({
               display: block !important;
             }
 
-            /* Força a quebra de página antes do recibo interno */
-            .recibo-print-section {
-              page-break-before: always;
-              break-before: page;
+            /* Estilo do container geral e das páginas A4 */
+            .area-impressao {
+              width: 100%;
+            }
+
+            .pagina-a4 {
+              page-break-after: always;
+              break-after: page;
               display: block !important;
+              width: 100% !important;
+            }
+
+            .pagina-a4:last-child {
+              page-break-after: avoid;
+              break-after: avoid;
+            }
+
+            /* Evita quebras indesejadas no meio de blocos, tabelas e parágrafos */
+            tr, table, div, p, section {
+              page-break-inside: avoid;
+              break-inside: avoid;
+            }
+
+            /* Força renderização exata das cores e fundos */
+            * {
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+
+            /* Oculta toolbars, botões e barras de navegação */
+            .no-print, nav, button, header, footer:not(.recibo-interno-container footer) {
+              display: none !important;
+              visibility: hidden !important;
             }
           }
 
@@ -519,11 +547,13 @@ export default function PrintNFe({
         `}
       </style>
 
-      {docTipo === "nfe" ? <LayoutNFe n={n} /> : <LayoutNFCe n={n} />}
-
-      {/* Recibo Interno cortesia para impressão conjunta */}
-      <div className="recibo-print-section">
-        <ReciboInterno data={reciboData} />
+      <div className="area-impressao">
+        <div className="pagina-a4">
+          {docTipo === "nfe" ? <LayoutNFe n={n} /> : <LayoutNFCe n={n} />}
+        </div>
+        <div className="pagina-a4">
+          <ReciboInterno data={reciboData} />
+        </div>
       </div>
     </div>
   );
