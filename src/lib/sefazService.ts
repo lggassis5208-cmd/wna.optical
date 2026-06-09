@@ -170,13 +170,12 @@ export const SefazService = {
       };
 
       try {
-        const response = await fetch(`${baseUrl}/${mod}?ref=${ref}`, {
+        const response = await fetch('/api/nfe', {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Basic ${btoa(token + ':')}`
+            'Content-Type': 'application/json'
           },
-          body: JSON.stringify(focusPayload)
+          body: JSON.stringify({ ref, mod, payload: focusPayload })
         });
 
         const data = await response.json();
@@ -192,11 +191,7 @@ export const SefazService = {
           if (status === 'processando') {
             for (let i = 0; i < 3; i++) {
               await new Promise(resolve => setTimeout(resolve, 2000));
-              const checkRes = await fetch(`${baseUrl}/${mod}/${ref}`, {
-                headers: {
-                  'Authorization': `Basic ${btoa(token + ':')}`
-                }
-              });
+              const checkRes = await fetch(`/api/nfe?ref=${ref}&mod=${mod}`);
               if (checkRes.ok) {
                 const checkData = await checkRes.json();
                 if (checkData.status !== 'processando') {
@@ -226,13 +221,13 @@ export const SefazService = {
               ? 'https://api.focusnfe.com.br'
               : 'https://homologacao.focusnfe.com.br';
 
-            let danfeUrlResolved = '';
-            if (danfe) {
-              danfeUrlResolved = danfe.startsWith('/') ? `${host}${danfe}` : danfe;
-            } else if (chave && chave.length === 44) {
-              danfeUrlResolved = `${baseUrl}/${mod}/${ref}/danfe?token=${token}`;
-            } else {
-              danfeUrlResolved = `${host}/v2/${mod}/${ref}/danfe?token=${token}`;
+            let danfeUrlResolved = data.danfe_url || '';
+            if (!danfeUrlResolved) {
+              if (danfe) {
+                danfeUrlResolved = danfe.startsWith('/') ? `${host}${danfe}` : danfe;
+              } else {
+                danfeUrlResolved = `${host}/v2/${mod}/${ref}/danfe`;
+              }
             }
 
             return {
