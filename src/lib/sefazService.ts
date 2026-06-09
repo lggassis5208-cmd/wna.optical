@@ -556,6 +556,12 @@ export const SefazService = {
       return;
     }
 
+    // Tratar notas simuladas localmente para evitar prompts de Basic Auth/login no navegador
+    if (danfeUrl.includes('simulado_danfe') || danfeUrl.includes('sefaz.go.gov.br/danfe') || danfeUrl.includes('teste')) {
+      alert('Nota de Simulação/Teste local: O DANFE oficial nos servidores da Focus NFe não existe para notas fictícias. Por favor, utilize a opção "Imprimir / Gerar PDF" local para visualizar e salvar o documento gerado pelo sistema.');
+      return;
+    }
+
     // 3. Obter URL real se for redirect 302 da Focus NFe para a URL pré-assinada
     if (danfeUrl.includes('focusnfe.com.br') && danfeUrl.includes('/danfe')) {
       try {
