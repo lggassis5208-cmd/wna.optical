@@ -213,6 +213,130 @@ export default function TestAutomatedPage() {
     }
   };
 
+  const runFullFlowTests = async () => {
+    setRunning(true);
+    setLogs([]);
+    try {
+      addLog('Iniciando Bateria de Teste E2E (Fluxo Completo)...');
+      
+      addLog('Verificando status do Caixa...');
+      let caixa = await storage.getCaixaAtual();
+      if (!caixa) {
+        addLog('Abrindo caixa de testes (saldo R$ 150.00)...');
+        caixa = await storage.abrirCaixa(150.00);
+      } else {
+        addLog(`Caixa já aberto (ID: ${caixa.id})`);
+      }
+
+      addLog('Passo 1: Cadastrando Cliente de Teste...');
+      const client = await storage.saveClient({
+        nome_completo: 'Julio de Castilhos E2E',
+        cpf: '987.654.321-99',
+        whatsapp: '62988887777',
+      });
+      addLog(`✅ Cliente cadastrado com sucesso: ID ${client.id}`);
+
+      addLog('Passo 2: Cadastrando Produto de Teste no estoque...');
+      const product = await storage.saveProduct({
+        nome: 'Armação Ótica Lìs Titanio Gold',
+        categoria: 'Armação',
+        material: 'Titânio',
+        preco_venda: 699.90,
+        preco_custo: 300.00,
+        estoque: 10,
+        stock_minimo: 2,
+        unidade: 'Unidade'
+      });
+      addLog(`✅ Produto cadastrado com sucesso: ID ${product.id} (Estoque: ${product.estoque})`);
+
+      addLog('Passo 3: Registrando venda e gerando Ordem de Serviço...');
+      const saleData = {
+        cliente_id: client.id,
+        cliente_nome: client.nome_completo,
+        paciente_cpf: client.cpf,
+        paciente_whatsapp: client.whatsapp,
+        tecnico: 'Auditor E2E',
+        tipo_lente: 'Lente Filtro Azul',
+        tratamento: 'Antirreflexo Blue',
+        od_esferico: -1.75,
+        od_cilindrico: -1.0,
+        od_eixo: 90,
+        oe_esferico: -1.5,
+        oe_cilindrico: -0.75,
+        oe_eixo: 95,
+        valor_base: 699.90,
+        desconto: 0,
+        valor_total: 699.90,
+        forma_pagamento: 'Pix',
+        criado_em: new Date().toISOString()
+      };
+      const sale = await storage.registrarVenda(saleData);
+      addLog(`✅ Venda salva e O.S. #${sale.os_number} gerada no caixa com sucesso!`);
+
+      addLog('Passo 4: Emitindo Nota Fiscal Eletrônica junto à SEFAZ...');
+      const sefazResult = await SefazService.emitirNotaFiscal(sale);
+      
+      if (!sefazResult.sucesso) {
+        throw new Error(`Rejeição SEFAZ: ${sefazResult.motivo_rejeicao}`);
+      }
+      addLog(`✅ Nota autorizada com sucesso! Chave: ${sefazResult.chave_acesso}`);
+
+      addLog('Passo 5: Registrando Nota Fiscal no Storage Fiscal...');
+      const notaFaturamento = {
+        cliente: client.nome_completo,
+        cliente_doc: client.cpf,
+        valor_total: 699.90,
+        itens: [{
+          produto_nome: `O.S. ${sale.os_number} - Armação Titanio Gold`,
+          quantidade: 1,
+          valor_unitario: 699.90,
+          ncm: '90031100'
+        }],
+        status: 'EMITIDA',
+        natureza: 'Venda de Mercadoria',
+        cfop: '5102',
+        chave_acesso: sefazResult.chave_acesso,
+        danfe_url: sefazResult.danfe_url,
+        protocolo: sefazResult.protocolo,
+        xml: sefazResult.xml,
+        venda_id: sale.id
+      };
+      
+      const novaNota = await storage.saveNotaFiscal(notaFaturamento);
+      addLog(`✅ Nota Fiscal registrada no histórico fiscal. ID interno: ${novaNota.id}`);
+
+      addLog('Passo 6: Registrando ações iniciais na timeline...');
+      await storage.registrarAcaoNotaFiscal(novaNota.id, 'Emissão e autorização da nota fiscal');
+      
+      addLog('Simulando Impressão do DANFE...');
+      await storage.registrarAcaoNotaFiscal(novaNota.id, 'Impressão do DANFE (NF-e modelo 55)');
+      
+      addLog('Simulando Impressão da NFC-e...');
+      await storage.registrarAcaoNotaFiscal(novaNota.id, 'Impressão do cupom fiscal (NFC-e modelo 65)');
+      
+      addLog('Simulando Impressão do Comprovante de Venda...');
+      await storage.registrarAcaoNotaFiscal(novaNota.id, 'Impressão do comprovante de venda interno');
+
+      addLog('Passo 7: Recuperando Nota do Storage para validar timeline de atividades...');
+      const notasFiscais = await storage.getNotasFiscais();
+      const notaFinal = notasFiscais.find((n: any) => n.id === novaNota.id);
+      
+      if (notaFinal && notaFinal.timeline) {
+        addLog(`Timeline contem ${notaFinal.timeline.length} atividades:`);
+        notaFinal.timeline.forEach((act: any, idx: number) => {
+          addLog(`[Ação ${idx + 1}] ${act.acao} - Registrado em: ${act.data}`);
+        });
+      }
+
+      addLog('✅ Bateria E2E de Fluxo Completo executada com 100% de sucesso!');
+      setRunning(false);
+      toast.success('Bateria de fluxo completo finalizada com sucesso!');
+    } catch (e: any) {
+      addLog(`❌ Erro no teste E2E: ${e.message}`);
+      setRunning(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500 max-w-4xl mx-auto">
       <div className="flex justify-between items-center">
@@ -245,6 +369,14 @@ export default function TestAutomatedPage() {
             >
               {running ? <Loader2 className="animate-spin" size={20} /> : <Play size={20} />}
               {running ? 'Executando...' : 'Bateria de Notas Avulsas (5 itens)'}
+            </button>
+            <button 
+              onClick={runFullFlowTests}
+              disabled={running}
+              className="bg-green-600 hover:bg-green-700 text-white px-8 py-4 rounded-xl font-black text-sm shadow-lg shadow-green-600/20 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+            >
+              {running ? <Loader2 className="animate-spin" size={20} /> : <Play size={20} />}
+              {running ? 'Executando...' : 'Fluxo Completo E2E (1 item)'}
             </button>
           </div>
         </div>

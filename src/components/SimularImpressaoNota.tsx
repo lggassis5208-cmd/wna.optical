@@ -80,12 +80,12 @@ const MOCK_NFE: NotaFiscalData = {
 };
 
 interface Props {
-  tipo?: "nfe" | "nfce";
+  tipo?: "nfe" | "nfce" | "recibo";
 }
 
 export default function SimularImpressaoNota({ tipo: tipoInicial = "nfce" }: Props) {
-  const [tipo, setTipo] = useState<"nfe" | "nfce">(tipoInicial);
-  const data = tipo === "nfe" ? MOCK_NFE : MOCK_NFCE;
+  const [tipo, setTipo] = useState<"nfe" | "nfce" | "recibo">(tipoInicial);
+  const data = tipo === "nfe" ? MOCK_NFE : (tipo === "nfce" ? MOCK_NFCE : MOCK_NFE);
 
   const handleImprimir = () => {
     // Simulação direta: pula validações e SEFAZ, vai direto pra impressão.
@@ -107,6 +107,12 @@ export default function SimularImpressaoNota({ tipo: tipoInicial = "nfce" }: Pro
           style={btnStyle(tipo === "nfe")}
         >
           NF-e (A4)
+        </button>
+        <button
+          onClick={() => setTipo("recibo")}
+          style={btnStyle(tipo === "recibo")}
+        >
+          Comprovante de Venda
         </button>
         <button onClick={handleImprimir} style={{ ...btnStyle(false), marginLeft: "auto", fontWeight: 600 }}>
           Imprimir / Gerar PDF

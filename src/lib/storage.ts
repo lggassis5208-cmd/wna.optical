@@ -363,6 +363,29 @@ export const storage = {
     return null;
   },
 
+  async registrarAcaoNotaFiscal(notaId: string, acao: string) {
+    const notas = await this.getNotasFiscais();
+    const index = notas.findIndex((n: any) => n.id === notaId);
+    if (index !== -1) {
+      const nota = notas[index];
+      if (!nota.timeline) {
+        nota.timeline = [];
+      }
+      const dataStr = new Date().toLocaleDateString('pt-BR');
+      const horaStr = new Date().toLocaleTimeString('pt-BR');
+      const valorFormatado = Number(nota.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      nota.timeline.push({
+        id: Math.random().toString(36).substr(2, 9),
+        data: `${dataStr} ${horaStr}`,
+        acao: acao,
+        descricao: `Nota #${nota.numero} - Cliente: ${nota.cliente} - Valor: R$ ${valorFormatado}`
+      });
+      await this.saveNotaFiscal(nota);
+      return nota;
+    }
+    return null;
+  },
+
   async gerarNotaDeVenda(saleId: string) {
     const [sales, clients] = await Promise.all([
       this.getSales(),

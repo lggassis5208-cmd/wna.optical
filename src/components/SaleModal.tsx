@@ -25,7 +25,7 @@ import { openWhatsApp } from '../lib/whatsappUtils';
 import { SefazService } from '../lib/sefazService';
 import PrintOS from './PrintOS';
 import PrintNFe from './PrintNFe';
-import PrintNFCe from './PrintNFCe';
+import { BotaoEnviarComprovante, gerarPdfRecibo } from './WhatsAppComprovante';
 
 interface SaleModalProps {
   isOpen: boolean;
@@ -41,6 +41,7 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
   const [savedSale, setSavedSale] = useState<any>(null);
   const [isSuccess, setIsSuccess] = useState(false);
   const [client, setClient] = useState<any>(null);
+  const [comprovanteVendaPdfUrl, setComprovanteVendaPdfUrl] = useState<string>('');
 
   // --- Estados de busca inteligente de clientes ---
   const [clients, setClients] = useState<any[]>([]);
@@ -60,8 +61,38 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
   const [sefazSuccess, setSefazSuccess] = useState(false);
   const [sefazError, setSefazError] = useState('');
   const [danfeUrl, setDanfeUrl] = useState('');
-  const [notaInfo, setNotaInfo] = useState<{ xml: string, chave: string, protocolo: string } | null>(null);
-  const [tipoImpressaoFisco, setTipoImpressaoFisco] = useState<'os' | '55' | '65'>('os');
+  const [notaInfo, setNotaInfo] = useState<{ xml: string, chave: string, protocolo: string, id?: string } | null>(null);
+  const [tipoImpressaoFisco, setTipoImpressaoFisco] = useState<'os' | '55' | '65' | 'recibo'>('os');
+
+  const handlePrint = async (tipo: 'os' | '55' | '65' | 'recibo' = 'os') => {
+    setTipoImpressaoFisco(tipo);
+    if (notaInfo?.id && (tipo === '55' || tipo === '65' || tipo === 'recibo')) {
+      let acao = '';
+      if (tipo === '55') acao = 'Impressão do DANFE (NF-e modelo 55)';
+      else if (tipo === '65') acao = 'Impressão do cupom fiscal (NFC-e modelo 65)';
+      else if (tipo === 'recibo') acao = 'Impressão do comprovante de venda interno';
+      await storage.registrarAcaoNotaFiscal(notaInfo.id, acao);
+    }
+    setTimeout(() => {
+      window.print();
+    }, 100);
+  };
+
+  const handleVerDanfe = async () => {
+    if (danfeUrl) {
+      if (notaInfo?.id) {
+        await storage.registrarAcaoNotaFiscal(notaInfo.id, 'Visualização do DANFE oficial');
+      }
+      SefazService.abrirDanfe(danfeUrl);
+    }
+  };
+
+  const handleBaixarXML = async () => {
+    if (notaInfo?.xml && notaInfo?.chave && notaInfo?.id) {
+      await storage.registrarAcaoNotaFiscal(notaInfo.id, 'Download do arquivo XML');
+      SefazService.baixarXML(notaInfo.chave, notaInfo.xml);
+    }
+  };
 
   const [lenteSearch, setLenteSearch] = useState('');
   const [showLenteDropdown, setShowLenteDropdown] = useState(false);
@@ -80,18 +111,46 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
       if (result.sucesso) {
         setSefazSuccess(true);
         setDanfeUrl(result.danfe_url || '');
+
+        const notaFaturamento = {
+          cliente: sale.cliente_nome || sale.paciente_nome || 'Consumidor Final',
+          cliente_doc: sale.paciente_cpf || '',
+          valor_total: Number(sale.valor_total || 0),
+          itens: [
+            {
+              produto_nome: `LENTE ${sale.tipo_lente || ''} ${sale.tratamento || ''}`.trim() || 'PRODUTO ÓTICO',
+              quantidade: 1,
+              valor_unitario: Number(sale.valor_total || 0),
+              ncm: '90031100'
+            }
+          ],
+          status: 'EMITIDA',
+          natureza: 'Venda de Mercadoria',
+          cfop: '5102',
+          chave_acesso: result.chave_acesso,
+          danfe_url: result.danfe_url,
+          protocolo: result.protocolo,
+          xml: result.xml,
+          venda_id: sale.id
+        };
+
+        const novaNota = await storage.saveNotaFiscal(notaFaturamento);
+
         setNotaInfo({
           xml: result.xml || '',
           chave: result.chave_acesso || '',
-          protocolo: result.protocolo || ''
+          protocolo: result.protocolo || '',
+          id: novaNota.id
         });
         
-        // Salva a chave de acesso de 44 dígitos no histórico da venda
         if (sale.id && result.chave_acesso) {
           await storage.atualizarVendaFiscal(sale.id, result.chave_acesso, result.danfe_url || '');
         }
 
-        // Aqui não abrimos em nova aba. Em vez disso, mudamos o estado para imprimir nosso componente interno A4/Bobina.
+        await storage.registrarAcaoNotaFiscal(novaNota.id, 'Emissão e autorização da nota fiscal');
+        const acaoImpressao = modelo === '55' ? 'Impressão do DANFE (NF-e modelo 55)' : 'Impressão do cupom fiscal (NFC-e modelo 65)';
+        await storage.registrarAcaoNotaFiscal(novaNota.id, acaoImpressao);
+
         setTipoImpressaoFisco(modelo);
         setTimeout(() => window.print(), 800);
 
@@ -178,6 +237,46 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (isSuccess && savedSale) {
+      const formatarItens = () => {
+        return [
+          {
+            descricao: `LENTE ${savedSale.tipo_lente || ''} ${savedSale.tratamento || ''}`.trim() || 'PRODUTO ÓTICO',
+            quantidade: 1,
+            valorUnitario: Number(savedSale.valor_total || 0),
+            valorTotal: Number(savedSale.valor_total || 0),
+            refServico: savedSale.os_number ? `Ref. O.S. #${savedSale.os_number}` : undefined
+          }
+        ];
+      };
+      
+      const dataEmissaoString = savedSale.criado_em ? new Date(savedSale.criado_em).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR');
+      const horaString = savedSale.criado_em ? new Date(savedSale.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+      const reciboData = {
+        numero: savedSale.numero || savedSale.os_number || '000000',
+        serie: '001',
+        clienteNome: client?.nome_completo || client?.name || 'Consumidor Final',
+        clienteCpfCnpj: client?.cpf || '000.000.000-00',
+        dataEmissao: dataEmissaoString,
+        hora: horaString,
+        itens: formatarItens(),
+        subtotal: Number(savedSale.valor_total || 0),
+        desconto: Number(savedSale.desconto || 0),
+        total: Number(savedSale.valor_total || 0)
+      };
+
+      gerarPdfRecibo(reciboData).then(url => {
+        setComprovanteVendaPdfUrl(url);
+      }).catch(err => {
+        console.error("Erro ao gerar PDF do comprovante de venda:", err);
+      });
+    } else {
+      setComprovanteVendaPdfUrl('');
+    }
+  }, [isSuccess, savedSale, client]);
 
   // Filtra clientes conforme busca
   const filteredClients = clients.filter((c: any) => {
@@ -350,12 +449,7 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
     onClose();
   };
 
-  const handlePrint = (tipo: 'os' | '55' | '65' = 'os') => {
-    setTipoImpressaoFisco(tipo);
-    setTimeout(() => {
-      window.print();
-    }, 100);
-  };
+
 
   if (!isOpen) return null;
 
@@ -785,18 +879,41 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
                       <CheckCircle2 size={16} />
                       Nota Fiscal Autorizada com Sucesso!
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {danfeUrl && (
+                        <button
+                          onClick={handleVerDanfe}
+                          className="py-2.5 bg-primary text-black font-black rounded-xl text-center text-xs flex items-center justify-center gap-1.5 hover:scale-105 transition-all shadow-lg shadow-primary/10 md:col-span-2"
+                        >
+                          <ExternalLink size={14} />
+                          Ver DANFE Oficial
+                        </button>
+                      )}
                       <button
-                        onClick={() => handlePrint(tipoImpressaoFisco)}
-                        className="py-2.5 bg-primary text-black font-black rounded-xl text-center text-xs flex items-center justify-center gap-1.5 hover:scale-105 transition-all shadow-lg shadow-primary/10"
+                        onClick={() => handlePrint('55')}
+                        className="py-2.5 bg-[#FFD700] text-black font-black rounded-xl text-center text-xs flex items-center justify-center gap-1.5 hover:scale-105 transition-all shadow-lg shadow-[#FFD700]/10"
                       >
                         <Printer size={14} />
-                        Reimprimir DANFE
+                        Imprimir DANFE
+                      </button>
+                      <button
+                        onClick={() => handlePrint('65')}
+                        className="py-2.5 bg-blue-500 text-white font-black rounded-xl text-center text-xs flex items-center justify-center gap-1.5 hover:scale-105 transition-all shadow-lg shadow-blue-500/10"
+                      >
+                        <Printer size={14} />
+                        Imprimir NFC-e
+                      </button>
+                      <button
+                        onClick={() => handlePrint('recibo')}
+                        className="py-2.5 bg-gray-800 text-[#c5a880] border border-[#c5a880]/30 font-black rounded-xl text-center text-xs flex items-center justify-center gap-1.5 hover:scale-105 transition-all shadow-lg shadow-gray-800/10 md:col-span-2"
+                      >
+                        <Printer size={14} />
+                        Comprovante de Venda
                       </button>
                       {notaInfo?.xml && (
                         <button
-                          onClick={() => SefazService.baixarXML(notaInfo.chave, notaInfo.xml)}
-                          className="py-2.5 bg-white/5 border border-white/10 hover:bg-white/10 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all"
+                          onClick={handleBaixarXML}
+                          className="py-2.5 bg-white/5 border border-white/10 hover:bg-white/10 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all md:col-span-2"
                         >
                           <Download size={14} />
                           Baixar XML
@@ -807,29 +924,43 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
                 )}
               </div>
 
-              {client?.whatsapp && (
-                <div className="mt-6 animate-in slide-in-from-bottom-4 duration-500 w-full max-w-md">
-                  <button 
-                    onClick={() => openWhatsApp(
-                      client.whatsapp,
-                      `Olá, ${client.name}! Seu pedido de venda foi registrado com sucesso na Ótica Lìs. Seguem os detalhes:\n\nItens: ${savedSale?.tipo_lente} ${savedSale?.tratamento}\nPagamento: ${savedSale?.forma_pagamento}\nValor Total: R$ ${Number(savedSale?.valor_total || 0).toFixed(2)}\n\nObrigado pela preferência!`
-                    )}
-                    className="w-full py-4 bg-[#25D366]/20 hover:bg-[#25D366]/30 border border-[#25D366]/50 text-[#25D366] font-black rounded-2xl text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-[#25D366]/10"
-                  >
-                    <MessageSquare size={18} />
-                    Enviar Resumo no WhatsApp
-                  </button>
-                </div>
-              )}
+              <div className="mt-6 animate-in slide-in-from-bottom-4 duration-500 w-full max-w-md flex flex-col gap-3">
+                {/* 1) Comprovante de venda (interno, não-fiscal) — sempre disponível */}
+                <BotaoEnviarComprovante
+                  telefoneCliente={client?.whatsapp || ''}
+                  clienteNome={client?.nome_completo || client?.name || 'Cliente'}
+                  numeroNota={savedSale?.numero || savedSale?.os_number || '000000'}
+                  valorTotal={Number(savedSale?.valor_total || 0)}
+                  pdfUrl={comprovanteVendaPdfUrl}
+                  rotuloDocumento="comprovante de venda"
+                  nomeArquivo={`Comprovante-${savedSale?.numero || savedSale?.os_number || '000000'}.pdf`}
+                  textoBotao="Enviar comprovante por WhatsApp"
+                />
+
+                {/* 2) DANFE / NF-e (fiscal) — habilita só quando a nota foi autorizada */}
+                <BotaoEnviarComprovante
+                  telefoneCliente={client?.whatsapp || ''}
+                  clienteNome={client?.nome_completo || client?.name || 'Cliente'}
+                  numeroNota={notaInfo?.id ? String(notaInfo.id).slice(-6).toUpperCase() : (savedSale?.os_number || '000000').toUpperCase()}
+                  valorTotal={Number(savedSale?.valor_total || 0)}
+                  pdfUrl={danfeUrl}
+                  rotuloDocumento="comprovante fiscal (DANFE)"
+                  nomeArquivo={`DANFE-${notaInfo?.id ? String(notaInfo.id).slice(-6).toUpperCase() : '000000'}.pdf`}
+                  textoBotao="Enviar DANFE por WhatsApp"
+                />
+              </div>
 
               {savedSale && settings && tipoImpressaoFisco === 'os' && (
                 <PrintOS sale={savedSale} settings={settings} />
               )}
-              {savedSale && settings && tipoImpressaoFisco === '55' && (
-                <PrintNFe sale={savedSale} settings={settings} chaveAcesso={notaInfo?.chave} protocolo={notaInfo?.protocolo} />
-              )}
-              {savedSale && settings && tipoImpressaoFisco === '65' && (
-                <PrintNFCe sale={savedSale} settings={settings} chaveAcesso={notaInfo?.chave} protocolo={notaInfo?.protocolo} />
+              {savedSale && settings && tipoImpressaoFisco && tipoImpressaoFisco !== 'os' && (
+                <PrintNFe 
+                  tipo={tipoImpressaoFisco === '55' ? 'nfe' : (tipoImpressaoFisco === '65' ? 'nfce' : 'recibo')}
+                  sale={savedSale} 
+                  settings={settings} 
+                  chaveAcesso={notaInfo?.chave} 
+                  protocolo={notaInfo?.protocolo} 
+                />
               )}
             </div>
           )}

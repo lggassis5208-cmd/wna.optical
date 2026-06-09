@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { storage } from '../lib/storage';
 import { SefazService } from '../lib/sefazService';
 import NotaAvulsaModal from '../components/NotaAvulsaModal';
+import PrintNFe from '../components/PrintNFe';
 
 export default function FiscalPage() {
   const [notas, setNotas] = useState<any[]>([]);
@@ -24,8 +25,14 @@ export default function FiscalPage() {
   const [isAvulsaOpen, setIsAvulsaOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // Estados para impressão sob demanda
+  const [printNota, setPrintNota] = useState<any>(null);
+  const [printTipo, setPrintTipo] = useState<'nfe' | 'nfce' | 'recibo' | null>(null);
+  const [settings, setSettings] = useState<any>(null);
+
   useEffect(() => {
     fetchNotas();
+    storage.getSettings().then(setSettings);
   }, []);
 
   const fetchNotas = async () => {
@@ -39,7 +46,10 @@ export default function FiscalPage() {
 
   const handleCancelar = async (id: string) => {
     if (confirm('Deseja realmente cancelar esta Nota Fiscal?')) {
-      await storage.cancelarNotaFiscal(id);
+      const notaCancelada = await storage.cancelarNotaFiscal(id);
+      if (notaCancelada) {
+        await storage.registrarAcaoNotaFiscal(id, 'Cancelamento da nota fiscal');
+      }
       toast.error('Nota Fiscal Cancelada', {
         description: 'O status da nota foi atualizado no sistema.'
       });
@@ -50,6 +60,99 @@ export default function FiscalPage() {
   const openNota = (nota: any) => {
     setSelectedNota(nota);
     setIsModalOpen(true);
+  };
+
+  const handleVerDanfe = async (nota: any) => {
+    if (nota.danfe_url) {
+      await storage.registrarAcaoNotaFiscal(nota.id, 'Visualização do DANFE oficial');
+      SefazService.abrirDanfe(nota.danfe_url);
+      fetchNotas();
+      if (selectedNota && selectedNota.id === nota.id) {
+        setSelectedNota(prev => ({
+          ...prev,
+          timeline: [...(prev.timeline || []), {
+            id: Math.random().toString(36).substr(2, 9),
+            data: `${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR')}`,
+            acao: 'Visualização do DANFE oficial',
+            descricao: `Nota #${nota.numero} - Cliente: ${nota.cliente} - Valor: R$ ${Number(nota.valor_total).toFixed(2)}`
+          }]
+        }));
+      }
+    }
+  };
+
+  const handleBaixarXML = async (nota: any) => {
+    if (nota.xml) {
+      await storage.registrarAcaoNotaFiscal(nota.id, 'Download do arquivo XML');
+      SefazService.baixarXML(nota.chave_acesso || nota.id, nota.xml);
+      fetchNotas();
+      if (selectedNota && selectedNota.id === nota.id) {
+        setSelectedNota(prev => ({
+          ...prev,
+          timeline: [...(prev.timeline || []), {
+            id: Math.random().toString(36).substr(2, 9),
+            data: `${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR')}`,
+            acao: 'Download do arquivo XML',
+            descricao: `Nota #${nota.numero} - Cliente: ${nota.cliente} - Valor: R$ ${Number(nota.valor_total).toFixed(2)}`
+          }]
+        }));
+      }
+    }
+  };
+
+  const handleImprimir = async (nota: any) => {
+    const docDigits = (nota.cliente_doc || '').replace(/\D/g, '');
+    const modelo = docDigits.length === 14 ? 'DANFE (NF-e modelo 55)' : 'cupom fiscal (NFC-e modelo 65)';
+    const acao = `Impressão do ${modelo}`;
+    await storage.registrarAcaoNotaFiscal(nota.id, acao);
+    fetchNotas();
+    
+    // Atualiza a nota selecionada e abre o modal antes de imprimir
+    openNota(nota);
+    setTimeout(() => {
+      window.print();
+    }, 200);
+  };
+
+  const handleImprimirNoModal = async (nota: any) => {
+    const docDigits = (nota.cliente_doc || '').replace(/\D/g, '');
+    const modelo = docDigits.length === 14 ? 'DANFE (NF-e modelo 55)' : 'cupom fiscal (NFC-e modelo 65)';
+    const acao = `Impressão do ${modelo}`;
+    await storage.registrarAcaoNotaFiscal(nota.id, acao);
+    fetchNotas();
+    
+    if (selectedNota && selectedNota.id === nota.id) {
+      setSelectedNota(prev => ({
+        ...prev,
+        timeline: [...(prev.timeline || []), {
+          id: Math.random().toString(36).substr(2, 9),
+          data: `${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR')}`,
+          acao: acao,
+          descricao: `Nota #${nota.numero} - Cliente: ${nota.cliente} - Valor: R$ ${Number(nota.valor_total).toFixed(2)}`
+        }]
+      }));
+    }
+    
+    setTimeout(() => {
+      window.print();
+    }, 100);
+  };
+
+  const handlePrintDocument = async (nota: any, tipo: 'nfe' | 'nfce' | 'recibo') => {
+    let acao = '';
+    if (tipo === 'nfe') acao = 'Impressão do DANFE (NF-e modelo 55)';
+    else if (tipo === 'nfce') acao = 'Impressão do cupom fiscal (NFC-e modelo 65)';
+    else if (tipo === 'recibo') acao = 'Impressão do comprovante de venda interno';
+    
+    await storage.registrarAcaoNotaFiscal(nota.id, acao);
+    fetchNotas();
+
+    setPrintNota(nota);
+    setPrintTipo(tipo);
+    
+    setTimeout(() => {
+      window.print();
+    }, 250);
   };
 
   const filteredNotas = notas.filter(n => 
@@ -131,10 +234,10 @@ export default function FiscalPage() {
                     <StatusBadge status={n.status} />
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      {n.danfe_url && (
+                    <div className="flex justify-end gap-2">
+                       {n.danfe_url && (
                         <button 
-                          onClick={() => SefazService.abrirDanfe(n.danfe_url)}
+                          onClick={() => handleVerDanfe(n)}
                           className="p-2 bg-white/5 hover:bg-primary/20 hover:text-primary rounded-lg transition-all text-white/50"
                           title="Visualizar DANFE Oficial"
                         >
@@ -143,7 +246,7 @@ export default function FiscalPage() {
                       )}
                       {n.xml && (
                         <button 
-                          onClick={() => SefazService.baixarXML(n.chave_acesso || n.id, n.xml)}
+                          onClick={() => handleBaixarXML(n)}
                           className="p-2 bg-white/5 hover:bg-green-500/20 hover:text-green-400 rounded-lg transition-all"
                           title="Baixar XML Autorizado"
                         >
@@ -152,17 +255,31 @@ export default function FiscalPage() {
                       )}
                       <button 
                         onClick={() => openNota(n)}
-                        className="p-2 bg-white/5 hover:bg-primary/20 hover:text-primary rounded-lg transition-all"
+                        className="p-2 bg-white/5 hover:bg-primary/20 hover:text-primary rounded-lg transition-all animate-in fade-in"
                         title="Visualizar Espelho"
                       >
                         <FileText size={18} />
                       </button>
                       <button 
-                        onClick={() => { openNota(n); setTimeout(() => window.print(), 100); }}
-                        className="p-2 bg-white/5 hover:bg-blue-500/20 hover:text-blue-400 rounded-lg transition-all"
-                        title="Imprimir"
+                        onClick={() => handlePrintDocument(n, 'nfe')}
+                        className="px-2 py-1 bg-white/5 text-[9px] hover:bg-amber-500/20 hover:text-amber-400 rounded-lg transition-all border border-white/10 font-bold uppercase tracking-wider"
+                        title="Imprimir DANFE (NF-e A4)"
                       >
-                        <Printer size={18} />
+                        DANFE
+                      </button>
+                      <button 
+                        onClick={() => handlePrintDocument(n, 'nfce')}
+                        className="px-2 py-1 bg-white/5 text-[9px] hover:bg-blue-500/20 hover:text-blue-400 rounded-lg transition-all border border-white/10 font-bold uppercase tracking-wider"
+                        title="Imprimir NFC-e (Bobina)"
+                      >
+                        NFC-e
+                      </button>
+                      <button 
+                        onClick={() => handlePrintDocument(n, 'recibo')}
+                        className="px-2 py-1 bg-white/5 text-[9px] hover:bg-purple-500/20 hover:text-purple-400 rounded-lg transition-all border border-white/10 font-bold uppercase tracking-wider"
+                        title="Imprimir Comprovante de Venda (CVA)"
+                      >
+                        CVA
                       </button>
                       {n.status !== 'CANCELADA' && (
                         <button 
@@ -264,6 +381,30 @@ export default function FiscalPage() {
                     <p className="text-4xl font-black">R$ {Number(selectedNota.valor_total).toFixed(2)}</p>
                  </div>
               </div>
+
+              {/* Timeline de atividades da nota (Oculto na impressão) */}
+              <div className="space-y-4 pt-6 border-t border-black/10 print:hidden text-left">
+                <p className="text-[10px] font-black uppercase tracking-widest text-black/40">Timeline de Atividades</p>
+                <div className="relative border-l-2 border-primary/30 ml-3 pl-6 space-y-4">
+                  {selectedNota.timeline && selectedNota.timeline.length > 0 ? (
+                    selectedNota.timeline.map((act: any) => (
+                      <div key={act.id} className="relative">
+                        {/* Ponto na linha */}
+                        <div className="absolute -left-[31px] top-1.5 w-4 h-4 bg-primary rounded-full border-2 border-white shadow-sm flex items-center justify-center">
+                          <div className="w-1.5 h-1.5 bg-black rounded-full" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-black">{act.acao}</p>
+                          <p className="text-[10px] text-black/50">{act.data}</p>
+                          <p className="text-[10px] text-black/40 italic font-mono mt-0.5">{act.descricao}</p>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-xs text-black/30 italic">Sem atividades registradas nesta nota.</div>
+                  )}
+                </div>
+              </div>
             </div>
 
             <div className="p-8 border-t border-black/5 bg-black/[0.02] flex justify-between items-center print:hidden">
@@ -276,7 +417,7 @@ export default function FiscalPage() {
               <div className="flex items-center gap-3">
                 {selectedNota.xml && (
                   <button 
-                    onClick={() => SefazService.baixarXML(selectedNota.chave_acesso || selectedNota.id, selectedNota.xml)}
+                    onClick={() => handleBaixarXML(selectedNota)}
                     className="px-4 py-2 bg-green-500/10 hover:bg-green-500/20 text-green-600 rounded-xl text-sm font-bold border border-green-500/20 transition-all flex items-center gap-2"
                     title="Baixar XML"
                   >
@@ -286,7 +427,7 @@ export default function FiscalPage() {
                 )}
                 {selectedNota.danfe_url && (
                   <button 
-                    onClick={() => SefazService.abrirDanfe(selectedNota.danfe_url)}
+                    onClick={() => handleVerDanfe(selectedNota)}
                     className="px-4 py-2 bg-primary/10 hover:bg-primary/20 text-primary rounded-xl text-sm font-bold border border-primary/20 transition-all flex items-center gap-2"
                     title="Visualizar DANFE"
                   >
@@ -295,7 +436,7 @@ export default function FiscalPage() {
                   </button>
                 )}
                 <button 
-                  onClick={() => window.print()}
+                  onClick={() => handleImprimirNoModal(selectedNota)}
                   className="px-8 py-3 bg-[#FFD700] text-black font-black rounded-xl shadow-lg shadow-[#FFD700]/20 hover:scale-[1.02] transition-all flex items-center gap-2 border border-black/10"
                 >
                   <Printer size={18} />
@@ -314,6 +455,40 @@ export default function FiscalPage() {
           fetchNotas();
         }} 
       />
+
+      {printNota && settings && printTipo && (
+        <PrintNFe 
+          tipo={printTipo}
+          sale={{
+            paciente_nome: printNota.cliente,
+            paciente_cpf: printNota.cliente_doc,
+            cliente_endereco: 'Não Informado',
+            cliente_bairro: 'Não Informado',
+            cliente_cep: '00000-000',
+            valor_total: printNota.valor_total,
+            criado_em: printNota.data_emissao,
+            forma_pagamento: 'Dinheiro',
+            itens: printNota.itens && printNota.itens.length > 0 ? printNota.itens.map((item: any, idx: number) => ({
+              id: item.id || String(idx + 1).padStart(3, '0'),
+              nome: item.nome || item.descricao || 'PRODUTO',
+              ncm: item.ncm || '90031100',
+              qtd: item.qtd || item.quantidade || 1,
+              vUn: item.vUn || item.valorUnitario || item.valor_unitario || item.valor_total || 0,
+              vTot: item.vTot || item.valorTotal || item.valor_total || 0,
+            })) : [{
+              id: '001',
+              nome: 'Venda de Mercadorias (Ref. Ordem de Serviço)',
+              ncm: '90031100',
+              qtd: 1,
+              vUn: printNota.valor_total,
+              vTot: printNota.valor_total
+            }]
+          }}
+          settings={settings}
+          chaveAcesso={printNota.chave_acesso || ''}
+          protocolo={printNota.protocolo_autorizacao || printNota.protocolo || ''}
+        />
+      )}
     </div>
   );
 }
@@ -321,6 +496,7 @@ export default function FiscalPage() {
 function StatusBadge({ status }: { status: string }) {
   const configs: any = {
     'EMITIDA': { color: 'bg-[#00DF81]/20 text-[#00DF81] border-[#00DF81]/30', label: 'Emitida', icon: <CheckCircle2 size={12} /> },
+    'AUTORIZADA': { color: 'bg-[#00DF81]/20 text-[#00DF81] border-[#00DF81]/30', label: 'Autorizada', icon: <CheckCircle2 size={12} /> },
     'PENDENTE': { color: 'bg-yellow-500/20 text-yellow-500 border-yellow-500/30', label: 'Pendente', icon: <Clock size={12} /> },
     'CANCELADA': { color: 'bg-red-500/20 text-red-500 border-red-500/30', label: 'Cancelada', icon: <XCircle size={12} /> }
   };

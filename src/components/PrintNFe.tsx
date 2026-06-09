@@ -3,21 +3,6 @@ import { formatDate } from "../lib/dateUtils";
 import { QRCodeSVG } from "qrcode.react";
 import ReciboInterno, { type ReciboData } from "./ReciboInterno";
 
-/**
- * PrintNFe.tsx — componente de impressão de documentos fiscais (Ótica Lìs)
- *
- * Cobre dois layouts:
- *   - "nfe"  -> NF-e modelo 55, A4 paisagem (com canhoto, código de barras)
- *   - "nfce" -> NFC-e modelo 65, cupom bobina ~80mm (com QR Code)
- *
- * Resolvendo o "PDF em branco":
- * A causa típica é o template renderizar ANTES dos dados da venda chegarem,
- * ou os dados virem undefined e nenhum fallback ser aplicado.
- * Aqui os dados são SEMPRE normalizados antes da renderização (ver normalize()).
- */
-
-// ----------------------------- Tipos -----------------------------
-
 export interface Emitente {
   razaoSocial?: string;
   cnpj?: string;
@@ -60,7 +45,7 @@ export interface Impostos {
 }
 
 export interface NotaFiscalData {
-  tipo?: "nfe" | "nfce";
+  tipo?: "nfe" | "nfce" | "recibo";
   numero?: string;
   serie?: string;
   chaveAcesso?: string;
@@ -76,9 +61,6 @@ export interface NotaFiscalData {
   produtos?: ProdutoItem[];
   impostos?: Impostos;
 }
-
-// --------------------------- Fallbacks ---------------------------
-// Estes são os valores padrão quando a venda/config não traz o dado.
 
 const FALLBACK = {
   chaveAcesso: "0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000",
@@ -96,11 +78,6 @@ const brl = (v: number | undefined) =>
     maximumFractionDigits: 2,
   });
 
-/**
- * normalize() é o coração da correção: garante que NENHUM campo usado
- * no JSX seja undefined. Se os dados não chegaram, caímos nos fallbacks
- * em vez de renderizar um documento vazio.
- */
 function normalize(
   data?: NotaFiscalData,
   sale?: any,
@@ -110,7 +87,6 @@ function normalize(
 ) {
   let d: NotaFiscalData = data ?? {};
 
-  // Mapeamento para retrocompatibilidade com as props antigas (sale, settings, etc.)
   if (!data && sale) {
     const emit: Emitente = {
       razaoSocial: settings?.empresa?.nome_fantasia || settings?.empresa?.razao_social || "ÓTICA LÌS",
@@ -149,7 +125,7 @@ function normalize(
     })) : [
       {
         codigo: "001",
-        descricao: `LENTE ${sale.tipo_lente || ''} ${sale.tratamento || ''}`.trim(),
+        descricao: `LENTE ${sale.tipo_lente || ''} ${sale.tratamento || ''}`.trim() || "PRODUTO ÓTICO",
         ncm: "90031100",
         cfop: "5102",
         quantidade: 1,
@@ -212,8 +188,8 @@ function normalize(
     produtos: produtos.map((p, i) => ({
       codigo: p.codigo ?? String(i + 1).padStart(3, "0"),
       descricao: p.descricao ?? "PRODUTO",
-      ncm: p.ncm ?? "",
-      cfop: p.cfop ?? "",
+      ncm: p.ncm ?? "90031100",
+      cfop: p.cfop ?? "5102",
       quantidade: p.quantidade ?? 1,
       valorUnitario: p.valorUnitario ?? 0,
       valorTotal: p.valorTotal ?? (p.valorUnitario ?? 0) * (p.quantidade ?? 1),
@@ -233,14 +209,9 @@ function normalize(
   };
 }
 
-// --------------------------- Componente --------------------------
-
 interface PrintNFeProps {
   data?: NotaFiscalData;
-  /** Sobrescreve o tipo de documento independente do data.tipo */
-  tipo?: "nfe" | "nfce";
-
-  // Parâmetros antigos para compatibilidade
+  tipo?: "nfe" | "nfce" | "recibo";
   sale?: any;
   settings?: any;
   chaveAcesso?: string;
@@ -255,21 +226,13 @@ export default function PrintNFe({
   chaveAcesso,
   protocolo,
 }: PrintNFeProps) {
-  // Para passar no teste unitário que espera null se a venda não for fornecida
   if (!data && !sale) {
     return null;
   }
 
   const n = normalize(data, sale, settings, chaveAcesso, protocolo);
+  const docTipo = tipo ?? n.tipo;
 
-  // Se veio via props legadas (sale), o padrão é "nfe" (PrintNFe antigo só fazia NFe)
-  const docTipo = tipo ?? (sale ? "nfe" : n.tipo);
-
-  if (!data && !sale) {
-    console.warn("[PrintNFe] Nenhum dado recebido — renderizando com fallbacks.");
-  }
-
-  // Mapeamento dos dados para o Recibo Interno
   const dataEmissaoString = n.dataEmissao || new Date().toLocaleDateString("pt-BR");
   const [datePart, timePart] = dataEmissaoString.split(" ");
   
@@ -296,13 +259,15 @@ export default function PrintNFe({
     <div className="print-nfe-wrapper font-sans text-black bg-white">
       <style>
         {`
-          /* Oculta o wrapper principal na tela normal */
           .print-nfe-wrapper {
             display: none;
           }
 
           @media print {
-            @page { size: A4 portrait; margin: 10mm; }
+            @page { 
+              size: ${docTipo === "nfce" ? "80mm auto" : "A4 portrait"}; 
+              margin: ${docTipo === "nfce" ? "2mm" : "5mm"}; 
+            }
             body { 
               -webkit-print-color-adjust: exact; 
               print-color-adjust: exact; 
@@ -310,17 +275,14 @@ export default function PrintNFe({
               margin: 0;
             }
             
-            /* Oculta tudo na impressão para evitar que elementos pais de wraps profundos fiquem invisíveis */
             body * {
               visibility: hidden;
             }
             
-            /* Torna apenas a área da nota e seus elementos filhos visíveis */
             .print-nfe-wrapper, .print-nfe-wrapper * {
               visibility: visible;
             }
             
-            /* Posiciona a nota no topo esquerdo do papel de impressão */
             .print-nfe-wrapper {
               position: absolute;
               left: 0;
@@ -329,444 +291,312 @@ export default function PrintNFe({
               display: block !important;
             }
 
-            /* Estilo do container geral e das páginas A4 */
             .area-impressao {
               width: 100%;
+              display: flex;
+              justify-content: center;
             }
 
-            .pagina-a4 {
-              page-break-after: always;
-              break-after: page;
+            .pagina-impressao {
               display: block !important;
               width: 100% !important;
             }
 
-            .pagina-a4:last-child {
-              page-break-after: avoid;
-              break-after: avoid;
-            }
-
-            /* Evita quebras indesejadas no meio de blocos, tabelas e parágrafos */
-            tr, table, div, p, section {
-              page-break-inside: avoid;
-              break-inside: avoid;
-            }
-
-            /* Força renderização exata das cores e fundos */
-            * {
-              -webkit-print-color-adjust: exact !important;
-              print-color-adjust: exact !important;
-            }
-
-            /* Oculta toolbars, botões e barras de navegação */
             .no-print, nav, button, header, footer:not(.recibo-interno-container footer) {
               display: none !important;
               visibility: hidden !important;
             }
           }
-
-          /* Estilos de Estrutura do Layout NFe (A4) */
-          .folha-nfe {
-            width: 190mm;
-            margin: 0 auto;
-            border: 1px solid #000;
-            padding: 2px;
-            box-sizing: border-box;
-          }
-          .folha-nfe .row {
-            display: flex;
-            flex-direction: row;
-            width: 100%;
-          }
-          .folha-nfe .cell {
-            border-right: 1px solid #000;
-            padding: 3px 5px;
-            display: flex;
-            flex-direction: column;
-            box-sizing: border-box;
-            min-height: 28px;
-          }
-          .folha-nfe .cell:last-child {
-            border-right: none;
-          }
-          .folha-nfe .b-bottom {
-            border-bottom: 1px solid #000;
-          }
-          .folha-nfe .center {
-            text-align: center;
-            justify-content: center;
-            align-items: center;
-          }
-          .folha-nfe .right {
-            text-align: right;
-          }
-          .folha-nfe .bold {
-            font-weight: bold;
-          }
-          .folha-nfe .val {
-            font-size: 11px;
-          }
-          .folha-nfe .label {
-            font-size: 7px;
-            color: #333;
-            margin-bottom: 1px;
-            display: block;
-            font-weight: normal;
-            text-transform: uppercase;
-          }
-          .folha-nfe .sec-title {
-            font-size: 8px;
-            font-weight: bold;
-            margin-top: 5px;
-            margin-bottom: 2px;
-            text-transform: uppercase;
-            background: #f0f0f0;
-            padding: 2px 4px;
-            border: 1px solid #000;
-            border-bottom: none;
-          }
-          .folha-nfe .barcode-placeholder {
-            height: 35px;
-            width: 100%;
-            background: #eaeaea;
-            margin-bottom: 2px;
-            border: 1px solid #ccc;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: monospace;
-            font-size: 10px;
-          }
-          .folha-nfe table.prod {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 0px;
-            border: 1px solid #000;
-          }
-          .folha-nfe table.prod th {
-            font-size: 7px;
-            font-weight: bold;
-            border-right: 1px solid #000;
-            border-bottom: 1px solid #000;
-            padding: 3px;
-            text-align: left;
-            background: #f5f5f5;
-            text-transform: uppercase;
-          }
-          .folha-nfe table.prod td {
-            font-size: 8px;
-            border-right: 1px solid #000;
-            border-bottom: 1px solid #000;
-            padding: 3px;
-          }
-          .folha-nfe table.prod th:last-child, .folha-nfe table.prod td:last-child {
-            border-right: none;
-          }
-
-          /* Estilos de Estrutura do Layout NFCe (Bobina 80mm) */
-          .cupom-nfce {
-            width: 76mm;
-            padding: 2px;
-            font-family: Arial, Helvetica, sans-serif;
-            font-size: 10px;
-            line-height: 1.3;
-            box-sizing: border-box;
-            margin: 0 auto;
-            color: #000;
-            background: #fff;
-          }
-          .cupom-nfce .center {
-            text-align: center;
-          }
-          .cupom-nfce .bold {
-            font-weight: bold;
-          }
-          .cupom-nfce .emit-nome {
-            font-size: 13px;
-            font-weight: bold;
-            text-transform: uppercase;
-            margin-bottom: 2px;
-          }
-          .cupom-nfce .divider {
-            border: none;
-            border-top: 1px dashed #000;
-            margin: 5px 0;
-          }
-          .cupom-nfce table.itens {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 9px;
-            margin: 4px 0;
-          }
-          .cupom-nfce table.itens th {
-            text-align: left;
-            border-bottom: 1px dashed #000;
-            padding: 2px 0;
-            font-weight: bold;
-          }
-          .cupom-nfce table.itens td {
-            padding: 3px 0;
-            vertical-align: top;
-          }
-          .cupom-nfce .c {
-            text-align: center;
-          }
-          .cupom-nfce .r {
-            text-align: right;
-          }
-          .cupom-nfce table.totais {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 10px;
-          }
-          .cupom-nfce table.totais td {
-            padding: 2px 0;
-          }
-          .cupom-nfce table.totais tr.pagar {
-            font-weight: bold;
-            font-size: 11px;
-          }
-          .cupom-nfce .chave {
-            font-size: 9px;
-            word-break: break-all;
-            margin-top: 3px;
-            font-family: monospace;
-            letter-spacing: 0.5px;
-          }
-          .cupom-nfce .qrbox {
-            width: 110px;
-            height: 110px;
-            border: 1px solid #000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 8px auto;
-            font-size: 10px;
-            background: #f9f9f9;
-          }
         `}
       </style>
 
       <div className="area-impressao">
-        <div className="pagina-a4">
-          {docTipo === "nfe" ? <LayoutNFe n={n} /> : <LayoutNFCe n={n} />}
-        </div>
-        <div className="pagina-a4">
-          <ReciboInterno data={reciboData} />
+        <div className="pagina-impressao">
+          {docTipo === "nfe" && <LayoutNFe n={n} />}
+          {docTipo === "nfce" && <LayoutNFCe n={n} />}
+          {docTipo === "recibo" && <ReciboInterno data={reciboData} />}
         </div>
       </div>
     </div>
   );
 }
-
-// ------------------------- Layout NF-e A4 ------------------------
 
 function LayoutNFe({ n }: { n: ReturnType<typeof normalize> }) {
   const { emitente: e, destinatario: d, impostos: imp } = n;
-  
   const formattedChave = n.chaveAcesso.replace(/(.{4})/g, "$1 ").trim();
 
   return (
-    <div className="folha-nfe">
-      {/* Canhoto */}
-      <div className="row b-bottom">
-        <div className="cell" style={{ flex: 1 }}>
-          <span className="label">
-            RECEBEMOS DE <b>{e.razaoSocial}</b> OS PRODUTOS CONSTANTES DA NOTA FISCAL INDICADA AO LADO
-          </span>
-          <div className="row" style={{ marginTop: 8, borderTop: "1px solid #000", paddingTop: 2 }}>
-            <div className="cell" style={{ flex: 1 }}><span className="label">DATA DE RECEBIMENTO</span></div>
-            <div className="cell" style={{ flex: 2, borderRight: "none" }}>
-              <span className="label">IDENTIFICAÇÃO E ASSINATURA DO RECEBEDOR</span>
-            </div>
+    <div className="bg-white text-black font-sans text-[10px] w-[190mm] mx-auto border border-black p-1">
+      {/* CABEÇALHO DANFE */}
+      <div className="flex border border-black mb-1">
+        {/* Emitente */}
+        <div className="w-[45%] border-r border-black p-2 flex flex-col justify-center items-center">
+          <img src="/logo_otica_lis.png" alt="Ótica Lìs" className="h-[40px] object-contain mb-1" />
+          <h1 className="font-bold text-xs uppercase text-center">{e.razaoSocial}</h1>
+          <p className="text-center text-[8px] mt-0.5">{e.endereco}</p>
+          <p className="text-center text-[8px]">{e.cidade} - {e.uf} {e.fone ? `| Fone: ${e.fone}` : ""}</p>
+        </div>
+        
+        {/* Título DANFE */}
+        <div className="w-[15%] border-r border-black p-2 flex flex-col items-center justify-center text-center">
+          <h2 className="font-bold text-lg leading-none">DANFE</h2>
+          <p className="text-[8px] mt-1">Documento Auxiliar da Nota Fiscal Eletrônica</p>
+          <div className="mt-2 text-left w-full text-[8px]">
+            <p>0 - Entrada</p>
+            <p>1 - Saída <span className="float-right border border-black px-1 font-bold">1</span></p>
+          </div>
+          <p className="mt-2 font-bold text-xs">Nº {n.numero}</p>
+          <p className="font-bold text-xs">SÉRIE: {n.serie}</p>
+          <p className="text-[8px]">Página 1 de 1</p>
+        </div>
+
+        {/* Código de Barras */}
+        <div className="w-[40%] p-2 flex flex-col justify-between">
+          <div>
+             <p className="uppercase font-bold text-[8px] mb-1">Controle do Fisco</p>
+             <div className="h-10 w-full border border-gray-300 flex items-center justify-center bg-gray-100">
+                <span className="font-mono text-xs tracking-widest font-bold">||||| | |||| |||| || | || ||||| |</span>
+             </div>
+          </div>
+          <div className="mt-2">
+             <p className="uppercase text-[8px]">Chave de Acesso</p>
+             <p className="font-mono text-[10px] font-bold">{formattedChave}</p>
+          </div>
+          <div className="mt-2 text-center text-[8px] leading-tight">
+             Consulta de autenticidade no portal nacional da NF-e www.nfe.fazenda.gov.br/portal ou no site da Sefaz Autorizadora
           </div>
         </div>
-        <div className="cell center" style={{ width: 110, borderRight: "none" }}>
-          <span className="bold val">NF-e</span><br />
-          <span className="label">Nº {n.numero}</span><br />
-          <span className="label">SÉRIE {n.serie}</span>
+      </div>
+
+      {/* NATUREZA DA OPERAÇÃO */}
+      <div className="flex border border-black mb-1">
+        <div className="w-[60%] border-r border-black p-1">
+          <p className="uppercase text-[7px]">Natureza da Operação</p>
+          <p className="font-bold">{n.naturezaOperacao}</p>
+        </div>
+        <div className="w-[40%] p-1">
+          <p className="uppercase text-[7px]">Protocolo de Autorização de Uso</p>
+          <p className="font-bold">{n.protocolo} - {n.dataEmissao}</p>
         </div>
       </div>
 
-      {/* Cabeçalho */}
-      <div className="row b-bottom">
-        <div className="cell center" style={{ width: 210 }}>
-          <span className="bold" style={{ fontSize: 13 }}>{e.razaoSocial}</span><br />
-          <span>{e.endereco}</span><br />
-          <span>{e.cidade} - {e.uf}</span>
-          {e.fone ? <><br /><span>Fone: {e.fone}</span></> : null}
+      {/* INSCRIÇÕES */}
+      <div className="flex border border-black mb-2">
+        <div className="w-[33.3%] border-r border-black p-1">
+           <p className="uppercase text-[7px]">Inscrição Estadual</p>
+           <p className="font-bold">{e.ie || "ISENTO"}</p>
         </div>
-        <div className="cell center" style={{ width: 150 }}>
-          <span className="bold val">DANFE</span><br />
-          <span className="label">Documento Auxiliar da Nota Fiscal Eletrônica</span><br />
-          <span className="label">Nº {n.numero} - SÉRIE {n.serie}</span>
+        <div className="w-[33.3%] border-r border-black p-1">
+           <p className="uppercase text-[7px]">Inscr. Estadual do Subst. Trib.</p>
+           <p className="font-bold"></p>
         </div>
-        <div className="cell center" style={{ flex: 1 }}>
-          <div className="barcode-placeholder">
-            ||||| | |||| |||| || | || ||||| |
-          </div>
-          <span className="label">CHAVE DE ACESSO</span>
-          <p style={{ wordBreak: "break-all", fontSize: 8 }}>{formattedChave}</p>
-          <span className="label" style={{ fontSize: 6 }}>Consulta de autenticidade no portal nacional da NF-e www.nfe.fazenda.gov.br/portal</span>
+        <div className="w-[33.3%] p-1">
+           <p className="uppercase text-[7px]">CNPJ</p>
+           <p className="font-bold">{e.cnpj}</p>
         </div>
       </div>
 
-      <div className="row b-bottom">
-        <div className="cell" style={{ flex: 3 }}>
-          <span className="label">NATUREZA DA OPERAÇÃO</span><br /><b>{n.naturezaOperacao}</b>
+      {/* DESTINATÁRIO */}
+      <p className="font-bold text-[9px] mb-0.5 uppercase">Destinatário / Remetente</p>
+      <div className="border border-black mb-2">
+        <div className="flex border-b border-black">
+           <div className="w-[60%] border-r border-black p-1">
+              <p className="uppercase text-[7px]">Nome / Razão Social</p>
+              <p className="font-bold truncate">{d.nome}</p>
+           </div>
+           <div className="w-[25%] border-r border-black p-1">
+              <p className="uppercase text-[7px]">CNPJ/CPF</p>
+              <p className="font-bold">{d.cpfCnpj}</p>
+           </div>
+           <div className="w-[15%] p-1">
+              <p className="uppercase text-[7px]">Data da Emissão</p>
+              <p className="font-bold">{n.dataEmissao ? n.dataEmissao.split(" ")[0] : ""}</p>
+           </div>
         </div>
-        <div className="cell" style={{ flex: 2, borderRight: "none" }}>
-          <span className="label">PROTOCOLO DE AUTORIZAÇÃO DE USO</span><br /><b>{n.protocolo}</b>
-        </div>
-      </div>
-
-      <div className="row b-bottom">
-        <div className="cell" style={{ flex: 1 }}><span className="label">INSCRIÇÃO ESTADUAL</span><br />{e.ie || "-"}</div>
-        <div className="cell" style={{ flex: 1, borderRight: "none" }}><span className="label">CNPJ</span><br />{e.cnpj}</div>
-      </div>
-
-      {/* Destinatário */}
-      <div className="sec-title">DESTINATÁRIO / REMETENTE</div>
-      <div className="row b-bottom">
-        <div className="cell" style={{ flex: 3 }}><span className="label">NOME / RAZÃO SOCIAL</span><br />{d.nome}</div>
-        <div className="cell" style={{ flex: 1 }}><span className="label">CNPJ / CPF</span><br />{d.cpfCnpj}</div>
-        <div className="cell" style={{ flex: 1, borderRight: "none" }}><span className="label">DATA EMISSÃO</span><br />{n.dataEmissao}</div>
-      </div>
-      <div className="row b-bottom">
-        <div className="cell" style={{ flex: 3 }}><span className="label">ENDEREÇO</span><br />{d.endereco}</div>
-        <div className="cell" style={{ flex: 1 }}><span className="label">BAIRRO</span><br />{d.bairro}</div>
-        <div className="cell" style={{ flex: 1, borderRight: "none" }}><span className="label">CEP</span><br />{d.cep}</div>
-      </div>
-
-      {/* Impostos */}
-      <div className="sec-title">CÁLCULO DO IMPOSTO</div>
-      <div className="row b-bottom">
-        <div className="cell" style={{ flex: 1 }}><span className="label">BASE ICMS</span><br />{brl(imp.baseIcms)}</div>
-        <div className="cell" style={{ flex: 1 }}><span className="label">VALOR ICMS</span><br />{brl(imp.valorIcms)}</div>
-        <div className="cell" style={{ flex: 1 }}><span className="label">DESCONTO</span><br />{brl(imp.desconto)}</div>
-        <div className="cell" style={{ flex: 1 }}><span className="label">TOTAL PRODUTOS</span><br />{brl(imp.totalProdutos)}</div>
-        <div className="cell" style={{ flex: 1, borderRight: "none", background: "#f0f0f0" }}>
-          <span className="label">TOTAL DA NOTA</span><br /><b>{brl(imp.totalNota)}</b>
+        <div className="flex">
+            <div className="w-[45%] border-r border-black p-1">
+              <p className="uppercase text-[7px]">Endereço</p>
+              <p className="font-bold truncate">{d.endereco}</p>
+           </div>
+           <div className="w-[25%] border-r border-black p-1">
+              <p className="uppercase text-[7px]">Bairro/Distrito</p>
+              <p className="font-bold truncate">{d.bairro}</p>
+           </div>
+           <div className="w-[10%] border-r border-black p-1">
+              <p className="uppercase text-[7px]">CEP</p>
+              <p className="font-bold">{d.cep}</p>
+           </div>
+           <div className="w-[20%] p-1">
+              <p className="uppercase text-[7px]">Data Saída/Entrada</p>
+              <p className="font-bold">{n.dataSaida ? n.dataSaida.split(" ")[0] : (n.dataEmissao ? n.dataEmissao.split(" ")[0] : "")}</p>
+           </div>
         </div>
       </div>
 
-      {/* Produtos */}
-      <div className="sec-title">DADOS DOS PRODUTOS / SERVIÇOS</div>
-      <table className="prod">
-        <thead>
-          <tr>
-            <th>CÓD</th><th>DESCRIÇÃO</th><th>NCM</th><th>CFOP</th>
-            <th className="center">QTD</th><th className="right">V. UNIT</th><th className="right">V. TOTAL</th>
-          </tr>
-        </thead>
-        <tbody>
-          {n.produtos.map((p, i) => (
-            <tr key={i}>
-              <td>{p.codigo}</td><td>{p.descricao}</td><td>{p.ncm}</td><td>{p.cfop}</td>
-              <td className="center">{p.quantidade}</td>
-              <td className="right">{brl(p.valorUnitario)}</td>
-              <td className="right">{brl(p.valorTotal)}</td>
+      {/* CÁLCULO DO IMPOSTO */}
+      <p className="font-bold text-[9px] mb-0.5 uppercase">Cálculo do Imposto</p>
+      <div className="border border-black mb-2 flex bg-white text-[8px]">
+         <div className="flex-1 border-r border-black p-1">
+            <p className="uppercase text-[6px]">Base Cálculo ICMS</p>
+            <p className="font-bold text-right">{brl(imp.baseIcms)}</p>
+         </div>
+         <div className="flex-1 border-r border-black p-1">
+            <p className="uppercase text-[6px]">Valor do ICMS</p>
+            <p className="font-bold text-right">{brl(imp.valorIcms)}</p>
+         </div>
+         <div className="flex-1 border-r border-black p-1">
+            <p className="uppercase text-[6px]">Valor Desconto</p>
+            <p className="font-bold text-right">{brl(imp.desconto)}</p>
+         </div>
+         <div className="flex-1 border-r border-black p-1">
+            <p className="uppercase text-[6px]">Valor Total dos Produtos</p>
+            <p className="font-bold text-right">{brl(imp.totalProdutos)}</p>
+         </div>
+         <div className="flex-1 p-1 bg-gray-50">
+            <p className="uppercase text-[6px] font-bold">Valor Total da Nota</p>
+            <p className="font-bold text-right">{brl(imp.totalNota)}</p>
+         </div>
+      </div>
+
+      {/* DADOS DOS PRODUTOS */}
+      <p className="font-bold text-[9px] mb-0.5 uppercase">Dados do Produto/Serviço</p>
+      <div className="border border-black min-h-[50mm] mb-2 bg-white">
+        <table className="w-full text-[8px]">
+          <thead>
+            <tr className="border-b border-black bg-gray-50 font-bold">
+              <th className="border-r border-black p-1 text-left">CÓD. PROD.</th>
+              <th className="border-r border-black p-1 text-left">DESCRIÇÃO DO PROD./SERV.</th>
+              <th className="border-r border-black p-1">NCM/SH</th>
+              <th className="border-r border-black p-1">CST</th>
+              <th className="border-r border-black p-1">CFOP</th>
+              <th className="border-r border-black p-1">UNID.</th>
+              <th className="border-r border-black p-1">QUANT.</th>
+              <th className="border-r border-black p-1">V. UNIT.</th>
+              <th className="p-1">V. TOTAL</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+             {n.produtos.map((p, i) => (
+                <tr key={i} className="border-b border-gray-200">
+                   <td className="border-r border-black p-1">{p.codigo}</td>
+                   <td className="border-r border-black p-1">{p.descricao}</td>
+                   <td className="border-r border-black p-1 text-center">{p.ncm}</td>
+                   <td className="border-r border-black p-1 text-center">0102</td>
+                   <td className="border-r border-black p-1 text-center">{p.cfop}</td>
+                   <td className="border-r border-black p-1 text-center">UN</td>
+                   <td className="border-r border-black p-1 text-right">{p.quantidade}.00</td>
+                   <td className="border-r border-black p-1 text-right">{brl(p.valorUnitario)}</td>
+                   <td className="p-1 text-right">{brl(p.valorTotal)}</td>
+                </tr>
+             ))}
+          </tbody>
+        </table>
+      </div>
 
-      <div className="sec-title">DADOS ADICIONAIS</div>
-      <div className="row">
-        <div className="cell" style={{ flex: 2, minHeight: 36 }}>
-          <span className="label">INFORMAÇÕES COMPLEMENTARES</span><br />
-          Documento emitido por ME/EPP optante pelo Simples Nacional.
-        </div>
-        <div className="cell" style={{ flex: 1, borderRight: "none", minHeight: 36 }}>
-          <span className="label">RESERVADO AO FISCO</span>
-        </div>
+      {/* DADOS ADICIONAIS */}
+      <p className="font-bold text-[9px] mb-0.5 uppercase">Dados Adicionais</p>
+      <div className="border border-black flex min-h-[20mm] bg-white">
+         <div className="w-[60%] border-r border-black p-1">
+            <p className="uppercase text-[7px] font-bold">Informações Complementares</p>
+            <p className="text-[8px] mt-1">
+              DOCUMENTO EMITIDO POR ME OU EPP OPTANTE PELO SIMPLES NACIONAL. 
+              NÃO GERA DIREITO A CRÉDITO FISCAL DE IPI.
+            </p>
+         </div>
+         <div className="w-[40%] p-1">
+            <p className="uppercase text-[7px] font-bold">Reservado ao Fisco</p>
+         </div>
       </div>
     </div>
   );
 }
-
-// ------------------------ Layout NFC-e cupom ----------------------
 
 function LayoutNFCe({ n }: { n: ReturnType<typeof normalize> }) {
   const { emitente: e, destinatario: d, impostos: imp } = n;
   const totalPagar = imp.totalNota || imp.totalProdutos || 0;
-  const urlConsulta = 'http://nfe.sefaz.go.gov.br/nfeweb/sites/nfce/danfeNFCe';
+  const urlConsulta = "http://nfe.sefaz.go.gov.br/nfeweb/sites/nfce/danfeNFCe";
+  const formattedChave = n.chaveAcesso.replace(/(.{4})/g, "$1 ").trim();
 
   return (
-    <div className="cupom-nfce">
-      <div className="center">
-        <p className="emit-nome">{e.razaoSocial}</p>
-        <p>CNPJ: {e.cnpj}</p>
-        <p>{e.endereco}</p>
-        <p>{e.cidade} - {e.uf}</p>
+    <div className="w-[80mm] border border-dashed border-gray-400 p-2 mx-auto bg-white text-black font-sans text-[12px]">
+      <div className="text-center font-bold mb-2 flex flex-col items-center">
+         <img src="/logo_otica_lis.png" alt="Ótica Lìs" className="h-[45px] object-contain mb-2" />
+         <h1 className="text-sm uppercase">{e.razaoSocial}</h1>
+         <p className="text-[10px] font-normal mt-1">CNPJ: {e.cnpj}</p>
+         <p className="text-[10px] font-normal">{e.endereco}</p>
+         <p className="text-[10px] font-normal">Documento Auxiliar da Nota Fiscal de Consumidor Eletrônica</p>
       </div>
 
-      <hr className="divider" />
-      <p className="center bold">DANFE NFC-e</p>
-      <p className="center">Documento Auxiliar da NFC-e</p>
-      <hr className="divider" />
-
-      <table className="itens">
-        <thead>
-          <tr><th>#</th><th>Descrição</th><th className="c">Qtd</th><th className="r">Vl.Un</th><th className="r">Total</th></tr>
-        </thead>
-        <tbody>
-          {n.produtos.map((p, i) => (
-            <tr key={i}>
-              <td>{i + 1}</td><td>{p.descricao}</td>
-              <td className="c">{p.quantidade}</td>
-              <td className="r">{brl(p.valorUnitario)}</td>
-              <td className="r">{brl(p.valorTotal)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      <hr className="divider" />
-      <table className="totais">
-        <tbody>
-          <tr><td>Qtd. total de itens</td><td className="r">{n.produtos.length}</td></tr>
-          <tr><td>Valor total R$</td><td className="r">{brl(imp.totalProdutos)}</td></tr>
-          <tr><td>Desconto R$</td><td className="r">{brl(imp.desconto)}</td></tr>
-          <tr className="pagar"><td>VALOR A PAGAR R$</td><td className="r">{brl(totalPagar)}</td></tr>
-          <tr><td>Forma de pagamento</td><td className="r">{n.formaPagamento}</td></tr>
-          <tr><td>Valor pago R$</td><td className="r">{brl(n.valorPago ?? totalPagar)}</td></tr>
-        </tbody>
-      </table>
-
-      <hr className="divider" />
-      <div className="center">
-        <p>Consulte pela Chave de Acesso em:</p>
-        <p>{urlConsulta}</p>
-        <p className="bold" style={{ marginTop: 5 }}>CHAVE DE ACESSO</p>
-        <p className="chave">{n.chaveAcesso.replace(/(.{4})/g, "$1 ").trim()}</p>
+      <div className="border-t border-b border-dashed border-black py-2 my-2 text-[10px]">
+         <table className="w-full text-left">
+           <thead>
+             <tr>
+               <th className="pb-1 w-10">Cód.</th>
+               <th className="pb-1">Desc.</th>
+               <th className="pb-1 text-right w-6">Qtd</th>
+               <th className="pb-1 text-right w-12">Vl.Un</th>
+               <th className="pb-1 text-right w-12">Vl.Tot</th>
+             </tr>
+           </thead>
+           <tbody>
+              {n.produtos.map((p, i) => (
+                <tr key={i}>
+                  <td className="align-top py-0.5">{p.codigo}</td>
+                  <td className="align-top py-0.5">{p.descricao}</td>
+                  <td className="text-right align-top py-0.5">{p.quantidade}</td>
+                  <td className="text-right align-top py-0.5">{p.valorUnitario.toFixed(2)}</td>
+                  <td className="text-right align-top py-0.5">{p.valorTotal.toFixed(2)}</td>
+                </tr>
+              ))}
+           </tbody>
+         </table>
       </div>
 
-      <hr className="divider" />
-      <div className="center">
-        <p>CONSUMIDOR</p>
-        <p>{d.nome}</p>
-        <p>CPF/CNPJ {d.cpfCnpj}</p>
-        
-        {/* QR Code dinâmico com fallback */}
-        <div className="flex justify-center my-3" style={{ display: 'flex', justifyContent: 'center' }}>
-          {n.chaveAcesso && n.chaveAcesso !== FALLBACK.chaveAcesso ? (
-            <QRCodeSVG 
-               value={`${urlConsulta}?p=${n.chaveAcesso.replace(/\s/g, '')}|2|1|1|`}
-               size={110}
-            />
-          ) : (
-            <div className="qrbox">QR Code NFC-e</div>
-          )}
-        </div>
+      <div className="text-[12px] font-bold">
+         <div className="flex justify-between">
+            <span>Qtd Total de Itens</span>
+            <span>{n.produtos.reduce((acc, p) => acc + p.quantidade, 0)}</span>
+         </div>
+         <div className="flex justify-between mt-1 text-sm">
+            <span>VALOR TOTAL R$</span>
+            <span>{totalPagar.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
+         </div>
+         <div className="flex justify-between mt-1 text-[10px] font-normal">
+            <span>Forma de Pagamento</span>
+            <span>Valor Pago R$</span>
+         </div>
+         <div className="flex justify-between text-[11px]">
+            <span>{n.formaPagamento}</span>
+            <span>{(n.valorPago ?? totalPagar).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
+         </div>
+      </div>
 
-        <p>Protocolo de Autorização:</p>
-        <p>{n.protocolo}</p>
-        <hr className="divider" />
-        <p>NFC-e nº {n.numero} - Série {n.serie}</p>
-        <p>Emissão: {n.dataEmissao}</p>
-        <p style={{ marginTop: 4 }}>Via Consumidor</p>
-        <p>{n.ambiente === "producao" ? "AMBIENTE DE PRODUÇÃO" : "AMBIENTE DE HOMOLOGAÇÃO"}</p>
+      <div className="text-center text-[10px] border-t border-dashed border-black pt-2 mt-2">
+         <p>Consulte pela Chave de Acesso em</p>
+         <p className="underline">{urlConsulta}</p>
+         <p className="font-bold my-2 font-mono tracking-widest break-words">{formattedChave}</p>
+      </div>
+
+      <div className="flex justify-center my-4">
+         {n.chaveAcesso && n.chaveAcesso !== FALLBACK.chaveAcesso ? (
+           <QRCodeSVG 
+              value={`${urlConsulta}?p=${n.chaveAcesso.replace(/\s/g, "")}|2|1|1|`}
+              size={120}
+           />
+         ) : (
+           <div className="w-[120px] h-[120px] bg-gray-200 border flex items-center justify-center text-[10px] text-center">
+             QR Code<br/>NFC-e
+           </div>
+         )}
+      </div>
+
+      <div className="text-center text-[9px] mt-2 border-t border-dashed border-black pt-2">
+         <p><strong>CONSUMIDOR CPF:</strong> {d.cpfCnpj}</p>
+         <p>{d.nome}</p>
+         <p className="mt-2 font-bold">NFC-e nº {n.numero} Série {n.serie}</p>
+         <p>Data de Emissão: {n.dataEmissao}</p>
+         <p>Protocolo de Autorização: {n.protocolo}</p>
+         <p className="mt-1 font-bold">{n.ambiente === "producao" ? "AMBIENTE DE PRODUÇÃO" : "AMBIENTE DE HOMOLOGAÇÃO"}</p>
       </div>
     </div>
   );

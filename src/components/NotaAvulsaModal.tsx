@@ -4,7 +4,6 @@ import { toast } from 'sonner';
 import { SefazService } from '../lib/sefazService';
 import { storage } from '../lib/storage';
 import PrintNFe from './PrintNFe';
-import PrintNFCe from './PrintNFCe';
 
 interface NotaAvulsaModalProps {
   isOpen: boolean;
@@ -29,9 +28,9 @@ export default function NotaAvulsaModal({ isOpen, onClose }: NotaAvulsaModalProp
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [danfeUrl, setDanfeUrl] = useState('');
-  const [notaInfo, setNotaInfo] = useState<{ xml: string, chave: string } | null>(null);
+  const [notaInfo, setNotaInfo] = useState<{ xml: string, chave: string, id: string, protocolo: string } | null>(null);
 
-  const [tipoImpressaoFisco, setTipoImpressaoFisco] = useState<'55' | '65' | null>(null);
+  const [tipoImpressaoFisco, setTipoImpressaoFisco] = useState<'55' | '65' | 'recibo' | null>(null);
   const [settings, setSettings] = useState<any>(null);
 
   useEffect(() => {
@@ -39,6 +38,35 @@ export default function NotaAvulsaModal({ isOpen, onClose }: NotaAvulsaModalProp
       storage.getSettings().then(setSettings);
     }
   }, [isOpen]);
+
+  const handlePrint = async (tipo: '55' | '65' | 'recibo') => {
+    setTipoImpressaoFisco(tipo);
+    if (notaInfo?.id) {
+      let acao = '';
+      if (tipo === '55') acao = 'Impressão do DANFE (NF-e modelo 55)';
+      else if (tipo === '65') acao = 'Impressão do cupom fiscal (NFC-e modelo 65)';
+      else if (tipo === 'recibo') acao = 'Impressão do comprovante de venda interno';
+      
+      await storage.registrarAcaoNotaFiscal(notaInfo.id, acao);
+    }
+    setTimeout(() => window.print(), 300);
+  };
+
+  const handleVerDanfe = async () => {
+    if (danfeUrl) {
+      if (notaInfo?.id) {
+        await storage.registrarAcaoNotaFiscal(notaInfo.id, 'Visualização do DANFE oficial');
+      }
+      SefazService.abrirDanfe(danfeUrl);
+    }
+  };
+
+  const handleBaixarXML = async () => {
+    if (notaInfo?.xml && notaInfo?.chave && notaInfo?.id) {
+      await storage.registrarAcaoNotaFiscal(notaInfo.id, 'Download do arquivo XML');
+      SefazService.baixarXML(notaInfo.chave, notaInfo.xml);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -123,7 +151,9 @@ export default function NotaAvulsaModal({ isOpen, onClose }: NotaAvulsaModalProp
         setDanfeUrl(result.danfe_url || '');
         setNotaInfo({
           xml: result.xml || '',
-          chave: result.chave_acesso || ''
+          chave: result.chave_acesso || '',
+          id: salePayload.id,
+          protocolo: result.protocolo || ''
         });
 
         // Registrar a nota fiscal emitida com sucesso no storage do sistema
@@ -149,6 +179,11 @@ export default function NotaAvulsaModal({ isOpen, onClose }: NotaAvulsaModalProp
 
         try {
           await storage.registrarNotaFiscal(notaFaturamento);
+          await storage.registrarAcaoNotaFiscal(salePayload.id, 'Emissão e autorização da nota fiscal');
+          
+          const modelo = cpfCnpj.replace(/\D/g, '').length === 14 ? '55' : '65';
+          const acaoImpressao = modelo === '55' ? 'Impressão do DANFE (NF-e modelo 55)' : 'Impressão do cupom fiscal (NFC-e modelo 65)';
+          await storage.registrarAcaoNotaFiscal(salePayload.id, acaoImpressao);
         } catch (storageErr) {
           console.warn('Nota emitida mas caixa não estava aberto para registro contábil:', storageErr);
         }
@@ -220,26 +255,36 @@ export default function NotaAvulsaModal({ isOpen, onClose }: NotaAvulsaModalProp
                 <div className="flex flex-col items-center gap-3">
                   <div className="flex flex-wrap justify-center gap-3">
                     <button
-                      onClick={() => SefazService.abrirDanfe(danfeUrl)}
+                      onClick={handleVerDanfe}
                       className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-black font-black rounded-xl hover:scale-105 transition-all text-sm shadow-lg shadow-primary/10"
                     >
                       <ExternalLink size={16} />
                       Ver DANFE Oficial
                     </button>
                     <button
-                      onClick={() => {
-                        const modelo = cpfCnpj.replace(/\D/g, '').length === 14 ? '55' : '65';
-                        setTipoImpressaoFisco(modelo);
-                        setTimeout(() => window.print(), 300);
-                      }}
+                      onClick={() => handlePrint('55')}
                       className="inline-flex items-center gap-2 px-6 py-3 bg-[#FFD700] text-black font-black rounded-xl hover:scale-105 transition-all text-sm shadow-lg shadow-[#FFD700]/10"
                     >
                       <Printer size={16} />
-                      Imprimir / Gerar PDF
+                      Imprimir DANFE
+                    </button>
+                    <button
+                      onClick={() => handlePrint('65')}
+                      className="inline-flex items-center gap-2 px-6 py-3 bg-blue-500 text-white font-black rounded-xl hover:scale-105 transition-all text-sm shadow-lg shadow-blue-500/10"
+                    >
+                      <Printer size={16} />
+                      Imprimir NFC-e
+                    </button>
+                    <button
+                      onClick={() => handlePrint('recibo')}
+                      className="inline-flex items-center gap-2 px-6 py-3 bg-gray-800 text-[#c5a880] border border-[#c5a880]/30 font-black rounded-xl hover:scale-105 transition-all text-sm shadow-lg shadow-gray-800/10"
+                    >
+                      <Printer size={16} />
+                      Comprovante de Venda
                     </button>
                     {notaInfo?.xml && (
                       <button
-                        onClick={() => SefazService.baixarXML(notaInfo.chave, notaInfo.xml)}
+                        onClick={handleBaixarXML}
                         className="inline-flex items-center gap-2 px-6 py-3 bg-white/5 border border-white/10 text-white font-black rounded-xl hover:scale-105 transition-all text-sm"
                       >
                         <Download size={16} />
@@ -408,52 +453,30 @@ export default function NotaAvulsaModal({ isOpen, onClose }: NotaAvulsaModalProp
       </div>
 
       {success && settings && tipoImpressaoFisco && (
-        tipoImpressaoFisco === '55' ? (
-          <PrintNFe 
-            sale={{
-              paciente_nome: nome,
-              paciente_cpf: cpfCnpj,
-              cliente_endereco: 'Não Informado',
-              cliente_bairro: 'Não Informado',
-              cliente_cep: '00000-000',
-              valor_total: totalNota,
-              criado_em: new Date().toISOString(),
-              forma_pagamento: 'Dinheiro',
-              itens: itens.map((item, idx) => ({
-                id: String(idx + 1).padStart(3, '0'),
-                nome: item.descricao,
-                ncm: item.ncm,
-                qtd: item.quantidade,
-                vUn: item.valor_unitario,
-                vTot: item.quantidade * item.valor_unitario,
-              }))
-            }}
-            settings={settings}
-            chaveAcesso={notaInfo?.chave || ''}
-            protocolo={notaInfo?.protocolo || ''}
-          />
-        ) : (
-          <PrintNFCe 
-            sale={{
-              paciente_nome: nome,
-              paciente_cpf: cpfCnpj,
-              valor_total: totalNota,
-              criado_em: new Date().toISOString(),
-              forma_pagamento: 'Dinheiro',
-              itens: itens.map((item, idx) => ({
-                id: String(idx + 1).padStart(3, '0'),
-                nome: item.descricao,
-                ncm: item.ncm,
-                qtd: item.quantidade,
-                vUn: item.valor_unitario,
-                vTot: item.quantidade * item.valor_unitario,
-              }))
-            }}
-            settings={settings}
-            chaveAcesso={notaInfo?.chave || ''}
-            protocolo={notaInfo?.protocolo || ''}
-          />
-        )
+        <PrintNFe 
+          tipo={tipoImpressaoFisco === '55' ? 'nfe' : (tipoImpressaoFisco === '65' ? 'nfce' : 'recibo')}
+          sale={{
+            paciente_nome: nome,
+            paciente_cpf: cpfCnpj,
+            cliente_endereco: 'Não Informado',
+            cliente_bairro: 'Não Informado',
+            cliente_cep: '00000-000',
+            valor_total: totalNota,
+            criado_em: new Date().toISOString(),
+            forma_pagamento: 'Dinheiro',
+            itens: itens.map((item, idx) => ({
+              id: String(idx + 1).padStart(3, '0'),
+              nome: item.descricao,
+              ncm: item.ncm,
+              qtd: item.quantidade,
+              vUn: item.valor_unitario,
+              vTot: item.quantidade * item.valor_unitario,
+            }))
+          }}
+          settings={settings}
+          chaveAcesso={notaInfo?.chave || ''}
+          protocolo={notaInfo?.protocolo || ''}
+        />
       )}
     </div>
   );

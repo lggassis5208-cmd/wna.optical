@@ -20,11 +20,14 @@ const PrintOS: React.FC<PrintOSProps> = ({ sale, settings }) => {
   };
 
   return (
-    <div className="print-os-container hidden print:block bg-white text-black font-sans min-h-screen" id="print-os">
+    <div className="print-os-container bg-white text-black font-sans" id="print-os">
       <style>{`
+        .print-os-container {
+          display: none;
+        }
         @media print {
           @page {
-            size: A4;
+            size: A4 portrait;
             margin: 10mm;
           }
           body { 
@@ -33,10 +36,16 @@ const PrintOS: React.FC<PrintOSProps> = ({ sale, settings }) => {
             -webkit-print-color-adjust: exact !important; 
             print-color-adjust: exact !important;
             font-size: 11px;
+            margin: 0;
+          }
+          body * {
+            visibility: hidden;
+          }
+          .print-os-container, .print-os-container * {
+            visibility: visible !important;
           }
           .print-os-container { 
             display: block !important;
-            visibility: visible !important;
             position: absolute; 
             left: 0; 
             top: 0; 
@@ -46,7 +55,10 @@ const PrintOS: React.FC<PrintOSProps> = ({ sale, settings }) => {
             padding: 0;
             background: white !important;
           }
-          #root > :not(.print-os-container) { display: none !important; }
+          .no-print {
+            display: none !important;
+            visibility: hidden !important;
+          }
         }
         .os-border { border: 1px solid #e5e7eb; }
         .os-border-light { border: 1px solid #f3f4f6; }
@@ -69,20 +81,15 @@ const PrintOS: React.FC<PrintOSProps> = ({ sale, settings }) => {
       {/* CABEÇALHO — Logo + Dados da Loja + Nº O.S. */}
       {/* =========================================== */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #e5e7eb', paddingBottom: '16px', marginBottom: '16px' }}>
-        {/* ESQUERDA: LOGOTIPO OFICIAL E NOME */}
+        {/* ESQUERDA: LOGOTIPO OFICIAL */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div style={{ 
-            width: '48px', height: '48px', borderRadius: '8px', 
-            backgroundColor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: '#fff', fontWeight: 900, fontSize: '24px'
-          }}>
-            LÌS
-          </div>
-          <div>
-            <div style={{ fontSize: '20px', fontWeight: 800, letterSpacing: '-0.5px', lineHeight: 1, color: '#000' }}>
-              ÓTICA LÌS
-            </div>
-            <div style={{ fontSize: '10px', color: '#4b5563', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '1px', marginTop: '4px' }}>
+          <img 
+            src="/logo_otica_lis.png" 
+            alt="Ótica Lìs" 
+            style={{ height: '65px', objectFit: 'contain' }} 
+          />
+          <div style={{ borderLeft: '1px solid #e5e7eb', paddingLeft: '16px' }}>
+            <div style={{ fontSize: '11px', color: '#000', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px' }}>
               Ordem de Serviço #{osNumberFormatted}
             </div>
             <div style={{ fontSize: '9px', color: '#6b7280', marginTop: '4px' }}>
