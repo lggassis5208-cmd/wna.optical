@@ -280,9 +280,25 @@ export default function PrintNFe({
               background: white !important; 
               margin: 0;
             }
-            /* Garante ocultação de outros elementos no print */
-            #root > :not(.print-nfe-wrapper) { display: none !important; }
-            .print-nfe-wrapper { display: block !important; }
+            
+            /* Oculta tudo na impressão para evitar que elementos pais de wraps profundos fiquem invisíveis */
+            body * {
+              visibility: hidden;
+            }
+            
+            /* Torna apenas a área da nota e seus elementos filhos visíveis */
+            .print-nfe-wrapper, .print-nfe-wrapper * {
+              visibility: visible;
+            }
+            
+            /* Posiciona a nota no topo esquerdo do papel de impressão */
+            .print-nfe-wrapper {
+              position: absolute;
+              left: 0;
+              top: 0;
+              width: 100%;
+              display: block !important;
+            }
           }
 
           /* Estilos de Estrutura do Layout NFe (A4) */
