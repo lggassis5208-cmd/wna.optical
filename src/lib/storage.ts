@@ -311,7 +311,11 @@ export const storage = {
 
   async saveContaPagar(conta: any) {
     const contas = JSON.parse(localStorage.getItem('lis_contas_pagar') || '[]');
-    const novaConta = { ...conta, id: Math.random().toString(36).substr(2, 9), status: 'PENDENTE' };
+    const novaConta = { 
+      id: conta.id || Math.random().toString(36).substr(2, 9), 
+      status: conta.status || 'PENDENTE',
+      ...conta 
+    };
     contas.push(novaConta);
     localStorage.setItem('lis_contas_pagar', JSON.stringify(contas));
     return novaConta;
@@ -319,10 +323,50 @@ export const storage = {
 
   async saveContaReceber(conta: any) {
     const contas = JSON.parse(localStorage.getItem('lis_contas_receber') || '[]');
-    const novaConta = { ...conta, id: Math.random().toString(36).substr(2, 9), status: 'PENDENTE' };
+    const novaConta = { 
+      id: conta.id || Math.random().toString(36).substr(2, 9), 
+      status: conta.status || 'PENDENTE',
+      ...conta 
+    };
     contas.push(novaConta);
     localStorage.setItem('lis_contas_receber', JSON.stringify(contas));
     return novaConta;
+  },
+
+  async updateContaPagar(conta: any) {
+    const contas = JSON.parse(localStorage.getItem('lis_contas_pagar') || '[]');
+    const index = contas.findIndex((c: any) => c.id === conta.id);
+    if (index !== -1) {
+      contas[index] = { ...contas[index], ...conta };
+      localStorage.setItem('lis_contas_pagar', JSON.stringify(contas));
+      return contas[index];
+    }
+    return null;
+  },
+
+  async updateContaReceber(conta: any) {
+    const contas = JSON.parse(localStorage.getItem('lis_contas_receber') || '[]');
+    const index = contas.findIndex((c: any) => c.id === conta.id);
+    if (index !== -1) {
+      contas[index] = { ...contas[index], ...conta };
+      localStorage.setItem('lis_contas_receber', JSON.stringify(contas));
+      return contas[index];
+    }
+    return null;
+  },
+
+  async deleteContaPagar(id: string) {
+    const contas = JSON.parse(localStorage.getItem('lis_contas_pagar') || '[]');
+    const filtradas = contas.filter((c: any) => c.id !== id);
+    localStorage.setItem('lis_contas_pagar', JSON.stringify(filtradas));
+    return true;
+  },
+
+  async deleteContaReceber(id: string) {
+    const contas = JSON.parse(localStorage.getItem('lis_contas_receber') || '[]');
+    const filtradas = contas.filter((c: any) => c.id !== id);
+    localStorage.setItem('lis_contas_receber', JSON.stringify(filtradas));
+    return true;
   },
 
   // --- FISCAL ---
