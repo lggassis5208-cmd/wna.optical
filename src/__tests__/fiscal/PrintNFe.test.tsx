@@ -39,8 +39,8 @@ describe('PrintNFe Component', () => {
     render(<PrintNFe sale={mockSale} settings={mockSettings} />);
     
     // Assegurar que os produtos aparecem
-    expect(screen.getByText('Lente XPTO')).toBeInTheDocument();
-    expect(screen.getByText('Armação XYZ')).toBeInTheDocument();
+    expect(screen.getAllByText('Lente XPTO').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Armação XYZ').length).toBeGreaterThan(0);
 
     // Como o PrintNFe soma os itens de acordo com nossa refatoração
     // Deve haver o valor total de 1500 na seção de total dos produtos

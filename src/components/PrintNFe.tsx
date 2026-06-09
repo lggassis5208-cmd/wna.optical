@@ -1,6 +1,7 @@
 import React from "react";
 import { formatDate } from "../lib/dateUtils";
 import { QRCodeSVG } from "qrcode.react";
+import ReciboInterno, { type ReciboData } from "./ReciboInterno";
 
 /**
  * PrintNFe.tsx — componente de impressão de documentos fiscais (Ótica Lìs)
@@ -268,10 +269,38 @@ export default function PrintNFe({
     console.warn("[PrintNFe] Nenhum dado recebido — renderizando com fallbacks.");
   }
 
+  // Mapeamento dos dados para o Recibo Interno
+  const dataEmissaoString = n.dataEmissao || new Date().toLocaleDateString("pt-BR");
+  const [datePart, timePart] = dataEmissaoString.split(" ");
+  
+  const reciboData: ReciboData = {
+    numero: n.numero,
+    serie: n.serie,
+    clienteNome: n.destinatario.nome,
+    clienteCpfCnpj: n.destinatario.cpfCnpj,
+    dataEmissao: datePart || new Date().toLocaleDateString("pt-BR"),
+    hora: timePart || new Date().toLocaleTimeString("pt-BR"),
+    itens: n.produtos.map(p => ({
+      descricao: p.descricao,
+      quantidade: p.quantidade,
+      valorUnitario: p.valorUnitario,
+      valorTotal: p.valorTotal,
+      refServico: sale?.os_number ? `Ref. O.S. #${sale.os_number}` : undefined
+    })),
+    subtotal: n.impostos.totalProdutos,
+    desconto: n.impostos.desconto,
+    total: n.impostos.totalNota
+  };
+
   return (
     <div className="print-nfe-wrapper font-sans text-black bg-white">
       <style>
         {`
+          /* Oculta o wrapper principal na tela normal */
+          .print-nfe-wrapper {
+            display: none;
+          }
+
           @media print {
             @page { size: auto; margin: 5mm; }
             body { 
@@ -297,6 +326,13 @@ export default function PrintNFe({
               left: 0;
               top: 0;
               width: 100%;
+              display: block !important;
+            }
+
+            /* Força a quebra de página antes do recibo interno */
+            .recibo-print-section {
+              page-break-before: always;
+              break-before: page;
               display: block !important;
             }
           }
@@ -484,6 +520,11 @@ export default function PrintNFe({
       </style>
 
       {docTipo === "nfe" ? <LayoutNFe n={n} /> : <LayoutNFCe n={n} />}
+
+      {/* Recibo Interno cortesia para impressão conjunta */}
+      <div className="recibo-print-section">
+        <ReciboInterno data={reciboData} />
+      </div>
     </div>
   );
 }
