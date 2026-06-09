@@ -33,6 +33,7 @@ vi.mock('../../lib/storage', () => ({
     getProducts: vi.fn().mockResolvedValue([]),
     seedDemoProducts: vi.fn().mockResolvedValue(undefined),
     getCaixaAtual: vi.fn().mockResolvedValue({ status: 'ABERTO' }),
+    getFinanceiro: vi.fn().mockResolvedValue({ pagar: [], receber: [] }),
   }
 }));
 

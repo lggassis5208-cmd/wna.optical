@@ -118,6 +118,14 @@ export default function ClientsPage() {
 
   useEffect(() => {
     fetchClients();
+    const params = new URLSearchParams(window.location.search);
+    const openModalParam = params.get('openModal');
+    if (openModalParam === 'true') {
+      setIsModalOpen(true);
+      // Limpar parâmetro para não ficar abrindo ao dar F5
+      const cleanUrl = window.location.pathname + window.location.hash;
+      window.history.replaceState({}, '', cleanUrl);
+    }
   }, [isModalOpen]);
 
   const filteredClients = clients.filter(c => 
