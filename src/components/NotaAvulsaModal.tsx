@@ -1,7 +1,9 @@
-import { useState } from 'react';
-import { X, Plus, Trash2, Send, CheckCircle, ExternalLink, RefreshCw, Download } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, Plus, Trash2, Send, CheckCircle, ExternalLink, RefreshCw, Download, Printer } from 'lucide-react';
 import { toast } from 'sonner';
 import { SefazService } from '../lib/sefazService';
+import { storage } from '../lib/storage';
+import PrintNFe from './PrintNFe';
 
 interface NotaAvulsaModalProps {
   isOpen: boolean;
@@ -27,6 +29,15 @@ export default function NotaAvulsaModal({ isOpen, onClose }: NotaAvulsaModalProp
   const [success, setSuccess] = useState(false);
   const [danfeUrl, setDanfeUrl] = useState('');
   const [notaInfo, setNotaInfo] = useState<{ xml: string, chave: string } | null>(null);
+
+  const [tipoImpressaoFisco, setTipoImpressaoFisco] = useState<'55' | '65' | null>(null);
+  const [settings, setSettings] = useState<any>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      storage.getSettings().then(setSettings);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -146,6 +157,11 @@ export default function NotaAvulsaModal({ isOpen, onClose }: NotaAvulsaModalProp
           SefazService.abrirDanfe(result.danfe_url);
         }
 
+        // Ativa a impressão local e dispara a janela do navegador
+        const modelo = cpfCnpj.replace(/\D/g, '').length === 14 ? '55' : '65';
+        setTipoImpressaoFisco(modelo);
+        setTimeout(() => window.print(), 800);
+
         toast.success('Nota Fiscal Avulsa emitida com sucesso!');
       } else {
         toast.error(`Rejeição SEFAZ: ${result.motivo_rejeicao || 'Erro desconhecido junto à SEFAZ.'}`);
@@ -165,6 +181,7 @@ export default function NotaAvulsaModal({ isOpen, onClose }: NotaAvulsaModalProp
     setSuccess(false);
     setDanfeUrl('');
     setNotaInfo(null);
+    setTipoImpressaoFisco(null);
   };
 
   return (
@@ -207,6 +224,17 @@ export default function NotaAvulsaModal({ isOpen, onClose }: NotaAvulsaModalProp
                     >
                       <ExternalLink size={16} />
                       Ver DANFE Oficial
+                    </button>
+                    <button
+                      onClick={() => {
+                        const modelo = cpfCnpj.replace(/\D/g, '').length === 14 ? '55' : '65';
+                        setTipoImpressaoFisco(modelo);
+                        setTimeout(() => window.print(), 300);
+                      }}
+                      className="inline-flex items-center gap-2 px-6 py-3 bg-[#FFD700] text-black font-black rounded-xl hover:scale-105 transition-all text-sm shadow-lg shadow-[#FFD700]/10"
+                    >
+                      <Printer size={16} />
+                      Imprimir / Gerar PDF
                     </button>
                     {notaInfo?.xml && (
                       <button
@@ -377,6 +405,48 @@ export default function NotaAvulsaModal({ isOpen, onClose }: NotaAvulsaModalProp
           </div>
         )}
       </div>
+
+      {success && settings && tipoImpressaoFisco && (
+        <PrintNFe 
+          data={{
+            tipo: cpfCnpj.replace(/\D/g, '').length === 14 ? 'nfe' : 'nfce',
+            numero: '000.000.123',
+            serie: '001',
+            chaveAcesso: notaInfo?.chave || '',
+            protocolo: '152260000000000',
+            dataEmissao: new Date().toLocaleDateString('pt-BR'),
+            emitente: {
+              razaoSocial: settings?.empresa?.nome_fantasia || 'ÓTICA LÌS',
+              cnpj: settings?.empresa?.cnpj || '39.156.577/0001-22',
+              endereco: settings?.empresa?.endereco || 'Av. Goiás, 1234 - Centro',
+              cidade: settings?.empresa?.cidade || 'Goiânia',
+              uf: settings?.empresa?.uf || 'GO',
+            },
+            destinatario: {
+              nome: nome,
+              cpfCnpj: cpfCnpj,
+              endereco: 'Não Informado',
+              bairro: 'Não Informado',
+              cep: '00000-000',
+            },
+            produtos: itens.map((item, idx) => ({
+              codigo: String(idx + 1).padStart(3, '0'),
+              descricao: item.descricao,
+              ncm: item.ncm,
+              cfop: '5102',
+              quantidade: item.quantidade,
+              valorUnitario: item.valor_unitario,
+              valorTotal: item.quantidade * item.valor_unitario,
+            })),
+            impostos: {
+              totalProdutos: totalNota,
+              desconto: 0,
+              totalNota: totalNota,
+            }
+          }} 
+          tipo={tipoImpressaoFisco === '55' ? 'nfe' : 'nfce'} 
+        />
+      )}
     </div>
   );
 }
