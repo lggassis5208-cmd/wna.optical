@@ -583,6 +583,30 @@ export const storage = {
     return null;
   },
 
+  async registrarEntrada(caixaId: string, descricao: string, valor: number, formaPagamento: string) {
+    const todosCaixas = JSON.parse(localStorage.getItem('lis_caixas') || '[]');
+    const index = todosCaixas.findIndex((c: any) => c.id === caixaId);
+    
+    if (index !== -1) {
+      if (!todosCaixas[index].movimentacoes) todosCaixas[index].movimentacoes = [];
+      
+      todosCaixas[index].movimentacoes.push({
+        id: Math.random().toString(36).substr(2, 9),
+        horario: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        tipo: 'ENTRADA',
+        descricao: descricao,
+        forma_pagamento: formaPagamento,
+        valor: Number(valor),
+        status: 'concluído'
+      });
+
+      localStorage.setItem('lis_caixas', JSON.stringify(todosCaixas));
+      return todosCaixas[index];
+    }
+    return null;
+  },
+
+
   async updateSaleStatus(saleId: string, newStatus: string) {
     const sales = await this.getSales();
     const index = sales.findIndex((s: any) => s.id === saleId);

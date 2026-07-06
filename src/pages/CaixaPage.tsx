@@ -19,8 +19,10 @@ export default function CaixaPage() {
   const [loading, setLoading] = useState(true);
   const [abrirModal, setAbrirModal] = useState(false);
   const [saidaModal, setSaidaModal] = useState(false);
+  const [entradaModal, setEntradaModal] = useState(false);
   const [valorAbertura, setValorAbertura] = useState('');
   const [novaSaida, setNovaSaida] = useState({ descricao: '', valor: '', forma: 'Dinheiro' });
+  const [novaEntrada, setNovaEntrada] = useState({ descricao: '', valor: '', forma: 'Dinheiro' });
 
   const carregarCaixa = async () => {
     setLoading(true);
@@ -69,6 +71,27 @@ export default function CaixaPage() {
       toast.success('Saída registrada com sucesso!');
       setSaidaModal(false);
       setNovaSaida({ descricao: '', valor: '', forma: 'Dinheiro' });
+      carregarCaixa();
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  };
+
+  const handleRegistrarEntrada = async () => {
+    if (!caixaAtivo) return;
+    if (!novaEntrada.descricao || !novaEntrada.valor) {
+      return toast.error('Preencha a descrição e o valor');
+    }
+    try {
+      await storage.registrarEntrada(
+        caixaAtivo.id,
+        novaEntrada.descricao,
+        Number(novaEntrada.valor),
+        novaEntrada.forma
+      );
+      toast.success('Entrada avulsa registrada com sucesso!');
+      setEntradaModal(false);
+      setNovaEntrada({ descricao: '', valor: '', forma: 'Dinheiro' });
       carregarCaixa();
     } catch (e: any) {
       toast.error(e.message);
@@ -189,12 +212,20 @@ export default function CaixaPage() {
                     </span>
                   )}
                 </h4>
-                <button
-                  onClick={() => setSaidaModal(true)}
-                  className="text-[10px] font-black uppercase tracking-widest bg-red-500/10 text-red-500 border border-red-500/20 px-3 py-1.5 rounded-lg hover:bg-red-500 hover:text-white transition-all"
-                >
-                  + Registrar Saída
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setEntradaModal(true)}
+                    className="text-[10px] font-black uppercase tracking-widest bg-green-500/10 text-green-500 border border-green-500/20 px-3 py-1.5 rounded-lg hover:bg-green-500 hover:text-white transition-all"
+                  >
+                    + Entrada Avulsa
+                  </button>
+                  <button
+                    onClick={() => setSaidaModal(true)}
+                    className="text-[10px] font-black uppercase tracking-widest bg-red-500/10 text-red-500 border border-red-500/20 px-3 py-1.5 rounded-lg hover:bg-red-500 hover:text-white transition-all"
+                  >
+                    + Registrar Saída
+                  </button>
+                </div>
               </div>
 
               {(!caixaAtivo.movimentacoes || caixaAtivo.movimentacoes.length === 0) ? (
@@ -442,6 +473,67 @@ export default function CaixaPage() {
                 className="w-full bg-red-500 text-white font-black py-4 rounded-2xl shadow-lg shadow-red-500/20 hover:scale-[1.02] transition-all active:scale-95"
               >
                 Confirmar Retirada
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Entrada Avulsa */}
+      {entradaModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="bg-surface w-full max-w-md rounded-3xl border border-white/10 shadow-2xl overflow-hidden animate-in zoom-in-95">
+            <div className="p-6 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <ArrowUpCircle size={20} className="text-green-500" />
+                Registrar Entrada Avulsa
+              </h3>
+              <button onClick={() => setEntradaModal(false)} className="p-2 hover:bg-white/5 rounded-full text-white/40">
+                <X size={24} />
+              </button>
+            </div>
+            <div className="p-8 space-y-6">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-white/30 uppercase tracking-widest ml-1">Descrição / Origem</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Recebimento Antigo, Empréstimo..."
+                    className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm text-white focus:outline-none focus:border-green-500/50"
+                    value={novaEntrada.descricao}
+                    onChange={(e) => setNovaEntrada({ ...novaEntrada, descricao: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-white/30 uppercase tracking-widest ml-1">Valor da Entrada (R$)</label>
+                  <input
+                    type="number"
+                    placeholder="0.00"
+                    className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm text-white focus:outline-none focus:border-green-500/50"
+                    value={novaEntrada.valor}
+                    onChange={(e) => setNovaEntrada({ ...novaEntrada, valor: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-white/30 uppercase tracking-widest ml-1">Forma de Entrada</label>
+                  <select
+                    className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm text-white focus:outline-none focus:border-green-500/50 appearance-none"
+                    value={novaEntrada.forma}
+                    onChange={(e) => setNovaEntrada({ ...novaEntrada, forma: e.target.value })}
+                  >
+                    <option value="Dinheiro">Dinheiro (Gaveta)</option>
+                    <option value="PIX">PIX</option>
+                    <option value="Cartão">Cartão / Outros</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className="p-6 border-t border-white/5 bg-white/[0.02]">
+              <button
+                onClick={handleRegistrarEntrada}
+                className="w-full bg-green-500 text-white font-black py-4 rounded-2xl shadow-lg shadow-green-500/20 hover:scale-[1.02] transition-all active:scale-95"
+              >
+                Confirmar Entrada
               </button>
             </div>
           </div>
