@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { storage } from '../lib/storage';
 import ProductModal from '../components/ProductModal';
+import { toast } from 'sonner';
 
 export default function InventoryPage() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -56,13 +57,27 @@ export default function InventoryPage() {
           <h2 className="text-2xl font-bold">Produtos & Estoque</h2>
           <p className="text-white/40 text-sm">Controle de inventário e parâmetros fiscais NFe</p>
         </div>
-        <button 
-          onClick={handleNew}
-          className="bg-primary text-black font-bold px-6 py-2.5 rounded-xl flex items-center gap-2 hover:shadow-lg hover:shadow-primary/20 transition-all active:scale-95"
-        >
-          <Plus size={20} />
-          Novo Produto
-        </button>
+        <div className="flex gap-3">
+          <button 
+            onClick={async () => {
+              if (confirm('ATENÇÃO: Deseja realmente excluir todos os produtos do estoque? Esta ação não pode ser desfeita.')) {
+                await storage.deleteAllProducts();
+                fetchProducts();
+                toast.success('Estoque zerado com sucesso!');
+              }
+            }}
+            className="bg-red-500/10 text-red-500 border border-red-500/20 font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 hover:bg-red-500 hover:text-white transition-all active:scale-95 text-sm"
+          >
+            Zerar Estoque
+          </button>
+          <button 
+            onClick={handleNew}
+            className="bg-primary text-black font-bold px-6 py-2.5 rounded-xl flex items-center gap-2 hover:shadow-lg hover:shadow-primary/20 transition-all active:scale-95"
+          >
+            <Plus size={20} />
+            Novo Produto
+          </button>
+        </div>
       </div>
 
       {/* Stats Grid */}

@@ -703,22 +703,47 @@ export const storage = {
   },
 
   async saveProduct(product: any) {
-    const products = await this.getProducts();
-    const newProduct = { 
-      ...product, 
-      id: product.id || Math.random().toString(36).substr(2, 9),
-      criado_em: product.criado_em || new Date().toISOString()
-    };
+    if (isSupabaseConfigured()) {
+      try {
+        const { data, error } = await supabase.from('produtos').upsert([product]).select();
+        if (!error && data) return data[0];
+      } catch (e) {
+        console.warn('Supabase product save error', e);
+      }
+    }
+    const products = JSON.parse(localStorage.getItem('lis_produtos') || '[]');
+    let newProduct = { ...product };
     
-    const index = products.findIndex((p: any) => p.id === newProduct.id);
-    if (index !== -1) {
-      products[index] = newProduct;
+    if (product.id) {
+      const index = products.findIndex((p: any) => p.id === product.id);
+      if (index !== -1) {
+        products[index] = { ...products[index], ...product };
+      } else {
+        products.push(newProduct);
+      }
     } else {
+      newProduct = { 
+        ...product, 
+        id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9),
+        criado_em: new Date().toISOString()
+      };
       products.push(newProduct);
     }
     
     localStorage.setItem('lis_produtos', JSON.stringify(products));
     return newProduct;
+  },
+
+  async deleteAllProducts() {
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('produtos').delete().neq('id', '0000000');
+      } catch (e) {
+        console.warn('Supabase product delete all error', e);
+      }
+    }
+    localStorage.setItem('lis_produtos', '[]');
+    return true;
   },
 
   async seedDemoProducts() {
