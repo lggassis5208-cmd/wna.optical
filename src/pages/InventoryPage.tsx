@@ -2,12 +2,13 @@ import { useState, useEffect } from 'react';
 import { 
   Plus, 
   Search, 
-  MoreVertical, 
   Package, 
   AlertTriangle,
   ArrowRightLeft,
   DollarSign,
-  Barcode
+  Barcode,
+  Trash2,
+  MoreVertical
 } from 'lucide-react';
 import { storage } from '../lib/storage';
 import ProductModal from '../components/ProductModal';
@@ -15,9 +16,9 @@ import { toast } from 'sonner';
 
 export default function InventoryPage() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [products, setProducts] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState('Todas');
 
   const fetchProducts = async () => {
     const data = await storage.getProducts();
@@ -38,11 +39,18 @@ export default function InventoryPage() {
     setIsModalOpen(true);
   };
 
-  const filteredProducts = products.filter(p => 
-    p.nome?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    p.marca?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.ncm?.includes(searchTerm)
-  );
+  const filteredProducts = products.filter(p => {
+    const matchesSearch = p.nome?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          p.marca?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          p.ncm?.includes(searchTerm);
+    
+    if (activeTab === 'Todas') return matchesSearch;
+    if (activeTab === 'Lentes') return matchesSearch && p.categoria === 'Lente';
+    if (activeTab === 'Armações') return matchesSearch && p.categoria === 'Armação';
+    if (activeTab === 'Outros') return matchesSearch && !['Lente', 'Armação'].includes(p.categoria);
+    
+    return matchesSearch;
+  });
 
   const stats = {
     totalItens: products.reduce((acc, p) => acc + Number(p.estoque || 0), 0),
@@ -106,7 +114,22 @@ export default function InventoryPage() {
       {/* Search & Table */}
       <div className="bg-surface border border-white/5 rounded-3xl overflow-hidden shadow-xl">
         <div className="p-6 border-b border-white/5 flex flex-col md:flex-row gap-4 items-center justify-between bg-white/[0.01]">
-          <div className="relative w-full md:w-96">
+          <div className="flex bg-white/5 p-1 rounded-xl w-full md:w-auto overflow-x-auto">
+            {['Todas', 'Armações', 'Lentes', 'Outros'].map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-6 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${
+                  activeTab === tab 
+                    ? 'bg-primary text-black shadow-md' 
+                    : 'text-white/40 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+          <div className="relative w-full md:w-80">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" size={18} />
             <input 
               type="text" 
@@ -115,11 +138,6 @@ export default function InventoryPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-10 pr-4 text-sm focus:outline-none focus:border-primary/50 transition-colors"
             />
-          </div>
-          <div className="flex gap-2 w-full md:w-auto">
-            <button className="flex-1 md:flex-none px-4 py-2 bg-white/5 rounded-xl text-sm font-medium hover:bg-white/10 transition-colors flex items-center justify-center gap-2">
-               <ArrowRightLeft size={16} /> Movimentações
-            </button>
           </div>
         </div>
 
@@ -152,7 +170,9 @@ export default function InventoryPage() {
                         </div>
                         <div>
                           <p className="font-bold text-sm text-white group-hover:text-primary transition-colors">{p.nome}</p>
-                          <p className="text-[10px] text-white/40 uppercase font-black tracking-widest">{p.categoria || 'Geral'} • {p.material || 'N/A'}</p>
+                          <p className="text-[10px] text-white/40 uppercase font-black tracking-widest">
+                            {p.categoria || 'Outros'} • {p.material || 'N/A'} {p.tipo_lente ? `• ${p.tipo_lente}` : ''}
+                          </p>
                         </div>
                       </div>
                     </td>
@@ -189,9 +209,23 @@ export default function InventoryPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button onClick={() => handleEdit(p)} className="p-2.5 hover:bg-white/10 rounded-xl transition-all cursor-pointer text-white/20 hover:text-white">
-                        <MoreVertical size={18} />
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button onClick={() => handleEdit(p)} className="p-2 hover:bg-white/10 rounded-xl transition-all cursor-pointer text-white/40 hover:text-white" title="Editar">
+                          <MoreVertical size={18} />
+                        </button>
+                        <button 
+                          onClick={async () => {
+                            if (confirm(`Deseja realmente excluir o produto ${p.nome}?`)) {
+                              await storage.deleteProduct(p.id);
+                              fetchProducts();
+                              toast.success('Produto excluído com sucesso!');
+                            }
+                          }} 
+                          className="p-2 hover:bg-red-500/10 rounded-xl transition-all cursor-pointer text-white/20 hover:text-red-500" title="Excluir"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );

@@ -14,6 +14,9 @@ export default function ProductModal({ isOpen, onClose, product }: ProductModalP
   const [formData, setFormData] = useState({
     nome: '',
     marca: '',
+    categoria: 'Armação',
+    material: 'Outros',
+    tipo_lente: '',
     unidade: 'UN',
     preco_custo: '',
     preco_venda: '',
@@ -42,6 +45,9 @@ export default function ProductModal({ isOpen, onClose, product }: ProductModalP
       setFormData({
         nome: '',
         marca: '',
+        categoria: 'Armação',
+        material: 'Outros',
+        tipo_lente: '',
         unidade: 'UN',
         preco_custo: '',
         preco_venda: '',
@@ -133,18 +139,78 @@ export default function ProductModal({ isOpen, onClose, product }: ProductModalP
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
               <Select 
-                label="Unidade" 
-                value={formData.unidade} 
-                onChange={(v: string) => setFormData({...formData, unidade: v})}
+                label="Categoria Principal" 
+                value={formData.categoria} 
+                onChange={(v: string) => setFormData({...formData, categoria: v, tipo_lente: v !== 'Lente' ? '' : formData.tipo_lente})}
                 options={[
-                  { value: 'UN', label: 'Unidade (UN)' },
-                  { value: 'PAR', label: 'Par (PAR)' },
-                  { value: 'PC', label: 'Peda (PC)' },
+                  { value: 'Armação', label: 'Armação' },
+                  { value: 'Lente', label: 'Lente' },
+                  { value: 'Lente de Contato', label: 'Lente de Contato' },
+                  { value: 'Acessório', label: 'Acessório' },
+                  { value: 'Serviço', label: 'Serviço' },
+                  { value: 'Outros', label: 'Outros' },
                 ]}
               />
+              <Select 
+                label="Material" 
+                value={formData.material} 
+                onChange={(v: string) => setFormData({...formData, material: v})}
+                options={[
+                  { value: 'Outros', label: 'Outros / Não se aplica' },
+                  { value: 'Resina', label: 'Resina' },
+                  { value: 'Policarbonato', label: 'Policarbonato' },
+                  { value: 'CR-39', label: 'CR-39' },
+                  { value: 'Alto Índice', label: 'Alto Índice' },
+                  { value: 'Metal', label: 'Metal' },
+                  { value: 'Acetato', label: 'Acetato' },
+                  { value: 'TR-90', label: 'TR-90' },
+                  { value: 'Injetado', label: 'Injetado' },
+                ]}
+              />
+              {formData.categoria === 'Lente' ? (
+                <Select 
+                  label="Tipo de Lente" 
+                  value={formData.tipo_lente} 
+                  onChange={(v: string) => setFormData({...formData, tipo_lente: v})}
+                  options={[
+                    { value: '', label: 'Selecione...' },
+                    { value: 'Visão Simples', label: 'Visão Simples' },
+                    { value: 'Multifocal', label: 'Multifocal' },
+                    { value: 'Bifocal', label: 'Bifocal' },
+                    { value: 'Ocupacional', label: 'Ocupacional' },
+                  ]}
+                />
+              ) : (
+                <Select 
+                  label="Unidade" 
+                  value={formData.unidade} 
+                  onChange={(v: string) => setFormData({...formData, unidade: v})}
+                  options={[
+                    { value: 'UN', label: 'Unidade (UN)' },
+                    { value: 'PAR', label: 'Par (PAR)' },
+                    { value: 'PC', label: 'Peça (PC)' },
+                  ]}
+                />
+              )}
+              {formData.categoria === 'Lente' && (
+                <Select 
+                  label="Unidade" 
+                  value={formData.unidade} 
+                  onChange={(v: string) => setFormData({...formData, unidade: v})}
+                  options={[
+                    { value: 'PAR', label: 'Par (PAR)' },
+                    { value: 'UN', label: 'Unidade (UN)' },
+                    { value: 'PC', label: 'Peça (PC)' },
+                  ]}
+                />
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
               <Input label="Preço Custo (R$)" type="number" step="0.01" value={formData.preco_custo} onChange={(v: string) => setFormData({...formData, preco_custo: v})} placeholder="0.00" />
               <Input label="Preço Venda (R$)" type="number" step="0.01" value={formData.preco_venda} onChange={(v: string) => setFormData({...formData, preco_venda: v})} placeholder="0.00" />
               <Input label="Estoque Inicial" type="number" value={formData.estoque} onChange={(v: string) => setFormData({...formData, estoque: v})} placeholder="0" />
+
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">

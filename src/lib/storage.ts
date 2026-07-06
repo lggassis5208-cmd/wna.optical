@@ -746,6 +746,20 @@ export const storage = {
     return true;
   },
 
+  async deleteProduct(id: string) {
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('produtos').delete().eq('id', id);
+      } catch (e) {
+        console.warn('Supabase product delete error', e);
+      }
+    }
+    const products = JSON.parse(localStorage.getItem('lis_produtos') || '[]');
+    const newProducts = products.filter((p: any) => p.id !== id);
+    localStorage.setItem('lis_produtos', JSON.stringify(newProducts));
+    return true;
+  },
+
   async seedDemoProducts() {
     const products = await this.getProducts();
     if (products.length === 0) {
