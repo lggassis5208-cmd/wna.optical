@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 
 export default function InventoryPage() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [products, setProducts] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState('Todas');
