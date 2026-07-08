@@ -8,14 +8,22 @@ import {
   Clock,
   Printer,
   X,
-  MessageCircle
+  MessageCircle,
+  AlertTriangle,
+  Calendar
 } from 'lucide-react';
 import { storage } from '../lib/storage';
+import { caixaService, Caixa } from '../lib/services/caixaService';
+import { movimentosService } from '../lib/services/movimentosService';
 import { toast } from 'sonner';
 import { openWhatsApp } from '../lib/whatsappUtils';
 
+// Mock temporário para usuário (substituir por auth.user)
+const mockUsuarioId = '00000000-0000-0000-0000-000000000000';
+
 export default function CaixaPage() {
-  const [caixaAtivo, setCaixaAtivo] = useState<any>(null);
+  const [caixaAtivo, setCaixaAtivo] = useState<Caixa | null>(null);
+  const [movimentos, setMovimentos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [abrirModal, setAbrirModal] = useState(false);
   const [saidaModal, setSaidaModal] = useState(false);
@@ -26,8 +34,18 @@ export default function CaixaPage() {
 
   const carregarCaixa = async () => {
     setLoading(true);
-    const caixa = await storage.getCaixaAtual();
-    setCaixaAtivo(caixa);
+    try {
+      const caixa = await caixaService.buscarCaixaAtivo();
+      setCaixaAtivo(caixa);
+      if (caixa) {
+        const movs = await movimentosService.buscarMovimentosPorCaixa(caixa.id);
+        setMovimentos(movs);
+      } else {
+        setMovimentos([]);
+      }
+    } catch (e) {
+      console.error(e);
+    }
     setLoading(false);
   };
 
@@ -38,7 +56,7 @@ export default function CaixaPage() {
   const handleAbrirCaixa = async () => {
     try {
       if (!valorAbertura) return toast.error('Informe o valor de abertura');
-      await storage.abrirCaixa(Number(valorAbertura));
+      await caixaService.abrirCaixa(Number(valorAbertura), mockUsuarioId);
       toast.success('Caixa aberto com sucesso!');
       setAbrirModal(false);
       carregarCaixa();
@@ -49,10 +67,17 @@ export default function CaixaPage() {
 
   const handleFecharCaixa = async () => {
     if (!caixaAtivo) return;
-    if (confirm('Deseja realmente fechar o caixa de hoje?')) {
-      await storage.fecharCaixa(caixaAtivo.id);
-      toast.success('Caixa fechado com sucesso!');
-      carregarCaixa();
+    const valorContado = prompt('Informe o valor contado fisicamente em caixa (R$):', saldoAtual().toString());
+    if (valorContado === null) return;
+    
+    if (confirm(`Deseja realmente fechar o caixa?\n\nSaldo Esperado: R$ ${saldoAtual().toFixed(2)}\nValor Contado: R$ ${Number(valorContado).toFixed(2)}`)) {
+      try {
+        await caixaService.fecharCaixa(caixaAtivo.id, Number(valorContado), saldoAtual(), mockUsuarioId);
+        toast.success('Caixa fechado com sucesso!');
+        carregarCaixa();
+      } catch (e: any) {
+        toast.error('Erro ao fechar o caixa.');
+      }
     }
   };
 
@@ -62,12 +87,14 @@ export default function CaixaPage() {
       return toast.error('Preencha a descrição e o valor');
     }
     try {
-      await storage.registrarSaida(
-        caixaAtivo.id,
-        novaSaida.descricao,
-        Number(novaSaida.valor),
-        novaSaida.forma
-      );
+      await movimentosService.registrarMovimento({
+        caixa_id: caixaAtivo.id,
+        tipo: 'DESPESA', // ou SANGRIA
+        descricao: novaSaida.descricao,
+        valor: Number(novaSaida.valor),
+        forma_pagamento: novaSaida.forma,
+        usuario_id: mockUsuarioId
+      });
       toast.success('Saída registrada com sucesso!');
       setSaidaModal(false);
       setNovaSaida({ descricao: '', valor: '', forma: 'Dinheiro' });
@@ -83,12 +110,14 @@ export default function CaixaPage() {
       return toast.error('Preencha a descrição e o valor');
     }
     try {
-      await storage.registrarEntrada(
-        caixaAtivo.id,
-        novaEntrada.descricao,
-        Number(novaEntrada.valor),
-        novaEntrada.forma
-      );
+      await movimentosService.registrarMovimento({
+        caixa_id: caixaAtivo.id,
+        tipo: 'SUPRIMENTO',
+        descricao: novaEntrada.descricao,
+        valor: Number(novaEntrada.valor),
+        forma_pagamento: novaEntrada.forma,
+        usuario_id: mockUsuarioId
+      });
       toast.success('Entrada avulsa registrada com sucesso!');
       setEntradaModal(false);
       setNovaEntrada({ descricao: '', valor: '', forma: 'Dinheiro' });
@@ -100,41 +129,61 @@ export default function CaixaPage() {
 
   // Calcula totais em tempo real a partir das movimentações
   const totaisPorForma = () => {
-    const movs = caixaAtivo?.movimentacoes || [];
-    const entradas = movs.filter((m: any) => m.tipo === 'ENTRADA');
+    const entradas = movimentos.filter(m => m.tipo === 'ENTRADA' || m.tipo === 'SUPRIMENTO');
     return {
       dinheiro: entradas
-        .filter((m: any) => (m.forma_pagamento || '').toLowerCase().includes('dinheiro'))
-        .reduce((sum: number, m: any) => sum + Number(m.valor), 0),
+        .filter(m => (m.forma_pagamento || '').toLowerCase().includes('dinheiro'))
+        .reduce((sum, m) => sum + Number(m.valor), 0),
       pix: entradas
-        .filter((m: any) => (m.forma_pagamento || '').toLowerCase().includes('pix'))
-        .reduce((sum: number, m: any) => sum + Number(m.valor), 0),
+        .filter(m => (m.forma_pagamento || '').toLowerCase().includes('pix'))
+        .reduce((sum, m) => sum + Number(m.valor), 0),
       cartao: entradas
-        .filter((m: any) => !(m.forma_pagamento || '').toLowerCase().includes('dinheiro') && !(m.forma_pagamento || '').toLowerCase().includes('pix'))
-        .reduce((sum: number, m: any) => sum + Number(m.valor), 0),
+        .filter(m => !(m.forma_pagamento || '').toLowerCase().includes('dinheiro') && !(m.forma_pagamento || '').toLowerCase().includes('pix'))
+        .reduce((sum, m) => sum + Number(m.valor), 0),
     };
   };
 
   const totalEntradas = () => {
-    const movs = caixaAtivo?.movimentacoes || [];
-    return movs.filter((m: any) => m.tipo === 'ENTRADA').reduce((sum: number, m: any) => sum + Number(m.valor), 0);
+    return movimentos.filter(m => m.tipo === 'ENTRADA' || m.tipo === 'SUPRIMENTO').reduce((sum, m) => sum + Number(m.valor), 0);
   };
 
   const totalSaidas = () => {
-    const movs = caixaAtivo?.movimentacoes || [];
-    return movs.filter((m: any) => m.tipo === 'SAIDA').reduce((sum: number, m: any) => sum + Number(m.valor), 0);
+    return movimentos.filter(m => m.tipo === 'SAIDA' || m.tipo === 'DESPESA' || m.tipo === 'SANGRIA').reduce((sum, m) => sum + Number(m.valor), 0);
   };
 
   const saldoAtual = () => {
-    return (caixaAtivo?.saldo_inicial || 0) + totalEntradas() - totalSaidas();
+    return (caixaAtivo?.valor_inicial || 0) + totalEntradas() - totalSaidas();
   };
 
   if (loading) return <div className="flex h-full items-center justify-center font-black animate-pulse">CARREGANDO...</div>;
 
   const formas = totaisPorForma();
+  
+  const tempoAbertoHoras = caixaAtivo ? (new Date().getTime() - new Date(caixaAtivo.data_abertura).getTime()) / (1000 * 60 * 60) : 0;
+  const is24hPassed = tempoAbertoHoras >= 24;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
+      {caixaAtivo && is24hPassed && (
+        <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 flex items-center justify-between gap-4 animate-pulse">
+          <div className="flex items-center gap-3">
+            <div className="bg-red-500/20 p-2 rounded-full text-red-500">
+              <AlertTriangle size={24} />
+            </div>
+            <div>
+              <h4 className="text-red-500 font-bold text-sm">Alerta de Fechamento de Caixa</h4>
+              <p className="text-red-400/80 text-xs mt-0.5">O caixa está aberto há mais de 24 horas ({Math.floor(tempoAbertoHoras)}h). Por favor, realize o fechamento do dia anterior e abra um novo caixa.</p>
+            </div>
+          </div>
+          <button 
+            onClick={handleFecharCaixa}
+            className="bg-red-500 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-red-600 transition-colors whitespace-nowrap"
+          >
+            Fechar Agora
+          </button>
+        </div>
+      )}
+
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-3xl font-black text-white">Caixa <span className="text-primary italic">Diário</span></h2>
@@ -150,7 +199,11 @@ export default function CaixaPage() {
           </button>
         ) : (
           <div className="flex gap-3">
-            <button className="bg-white/5 border border-white/10 text-white font-bold px-6 py-3 rounded-2xl flex items-center gap-2 hover:bg-white/10 transition-all">
+            <button className="bg-white/5 border border-white/10 text-white font-bold px-4 py-3 rounded-2xl flex items-center gap-2 hover:bg-white/10 transition-all text-sm">
+              <Calendar size={18} />
+              Histórico
+            </button>
+            <button className="bg-white/5 border border-white/10 text-white font-bold px-4 py-3 rounded-2xl flex items-center gap-2 hover:bg-white/10 transition-all text-sm">
               <Printer size={18} />
               Gerar Relatório
             </button>
@@ -182,7 +235,7 @@ export default function CaixaPage() {
             <div className="grid grid-cols-3 gap-6">
               <FinancialMetric
                 label="Saldo Inicial"
-                value={caixaAtivo.saldo_inicial}
+                value={caixaAtivo.valor_inicial}
                 icon={<Wallet size={20} />}
                 color="text-white/40"
               />
@@ -206,9 +259,9 @@ export default function CaixaPage() {
                 <h4 className="font-bold flex items-center gap-2">
                   <Clock size={18} className="text-primary" />
                   Movimentações do Dia
-                  {caixaAtivo.movimentacoes?.length > 0 && (
+                  {movimentos.length > 0 && (
                     <span className="ml-2 text-[10px] font-black bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                      {caixaAtivo.movimentacoes.length}
+                      {movimentos.length}
                     </span>
                   )}
                 </h4>
@@ -228,7 +281,7 @@ export default function CaixaPage() {
                 </div>
               </div>
 
-              {(!caixaAtivo.movimentacoes || caixaAtivo.movimentacoes.length === 0) ? (
+              {(!movimentos || movimentos.length === 0) ? (
                 <div className="p-16 text-center flex flex-col items-center gap-3">
                   <Clock size={32} className="text-white/10" />
                   <p className="text-white/20 italic text-sm">Aguardando lançamentos...</p>
@@ -248,15 +301,15 @@ export default function CaixaPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
-                      {[...caixaAtivo.movimentacoes].reverse().map((m: any) => (
+                      {movimentos.map((m: any) => (
                         <tr key={m.id} className="hover:bg-white/[0.02] transition-colors group">
                           {/* Horário */}
                           <td className="px-6 py-4">
-                            <span className="font-mono text-[11px] font-bold text-white/30">{m.horario}</span>
+                            <span className="font-mono text-[11px] font-bold text-white/30">{new Date(m.data_movimento).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
                           </td>
                           {/* Tipo */}
                           <td className="px-6 py-4">
-                            {m.tipo === 'ENTRADA' ? (
+                            {(m.tipo === 'ENTRADA' || m.tipo === 'SUPRIMENTO') ? (
                               <ArrowUpCircle size={18} className="text-green-500" />
                             ) : (
                               <ArrowDownCircle size={18} className="text-red-500" />
@@ -265,11 +318,11 @@ export default function CaixaPage() {
                           {/* Cliente / Descrição */}
                           <td className="px-6 py-4 max-w-[200px]">
                             <p className="text-sm font-bold text-white/80 truncate">{m.descricao}</p>
-                            {m.tipo === 'ENTRADA' && (
-                              <p className="text-[10px] text-white/20 font-black uppercase tracking-widest">Venda</p>
+                            {(m.tipo === 'ENTRADA' || m.tipo === 'SUPRIMENTO') && (
+                              <p className="text-[10px] text-white/20 font-black uppercase tracking-widest">{m.tipo}</p>
                             )}
-                            {m.tipo === 'SAIDA' && (
-                              <p className="text-[10px] text-red-500/50 font-black uppercase tracking-widest">Saída</p>
+                            {(m.tipo === 'SAIDA' || m.tipo === 'DESPESA' || m.tipo === 'SANGRIA') && (
+                              <p className="text-[10px] text-red-500/50 font-black uppercase tracking-widest">{m.tipo}</p>
                             )}
                           </td>
                           {/* Badge de Forma de Pagamento */}
@@ -278,8 +331,8 @@ export default function CaixaPage() {
                           </td>
                           {/* Valor */}
                           <td className="px-6 py-4">
-                            <span className={`font-black text-sm ${m.tipo === 'ENTRADA' ? 'text-green-500' : 'text-red-500'}`}>
-                              {m.tipo === 'SAIDA' ? '- ' : '+ '}
+                            <span className={`font-black text-sm ${(m.tipo === 'ENTRADA' || m.tipo === 'SUPRIMENTO') ? 'text-green-500' : 'text-red-500'}`}>
+                              {(m.tipo === 'SAIDA' || m.tipo === 'DESPESA' || m.tipo === 'SANGRIA') ? '- ' : '+ '}
                               R$ {Number(m.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                             </span>
                           </td>
@@ -356,14 +409,14 @@ export default function CaixaPage() {
                 <div className="flex justify-between text-sm">
                   <span className="text-white/40">Nº de Vendas</span>
                   <span className="font-bold text-white">
-                    {(caixaAtivo.movimentacoes || []).filter((m: any) => m.tipo === 'ENTRADA').length}
+                    {movimentos.filter((m: any) => m.tipo === 'ENTRADA').length}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-white/40">Ticket Médio</span>
                   <span className="font-bold text-white">
                     {(() => {
-                      const entradas = (caixaAtivo.movimentacoes || []).filter((m: any) => m.tipo === 'ENTRADA');
+                      const entradas = movimentos.filter((m: any) => m.tipo === 'ENTRADA');
                       if (entradas.length === 0) return 'R$ 0,00';
                       const total = entradas.reduce((s: number, m: any) => s + Number(m.valor), 0);
                       return `R$ ${(total / entradas.length).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
@@ -371,9 +424,9 @@ export default function CaixaPage() {
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-white/40">Sangrias</span>
+                  <span className="text-white/40">Sangrias / Saídas</span>
                   <span className="font-bold text-red-400">
-                    {(caixaAtivo.movimentacoes || []).filter((m: any) => m.tipo === 'SAIDA').length}x
+                    {movimentos.filter((m: any) => m.tipo === 'SAIDA' || m.tipo === 'DESPESA' || m.tipo === 'SANGRIA').length}x
                   </span>
                 </div>
               </div>

@@ -26,6 +26,8 @@ import { SefazService } from '../lib/sefazService';
 import PrintOS from './PrintOS';
 import PrintNFe from './PrintNFe';
 import { BotaoEnviarComprovante, gerarPdfRecibo } from './WhatsAppComprovante';
+import { caixaService } from '../lib/services/caixaService';
+import { vendasService, VendaInput } from '../lib/services/vendasService';
 
 interface SaleModalProps {
   isOpen: boolean;
@@ -187,11 +189,12 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
     is_birthday_discount: false,
     valor_base: '0.00',
     desconto: '0.00',
-    valor_total: '0.00',
-    forma_pagamento: 'Cartão de Crédito'
+    valor_total: '0.00'
   };
 
   const [formData, setFormData] = useState(initialState);
+  
+  const [pagamentos, setPagamentos] = useState<{forma_pagamento: string, valor: number}[]>([{ forma_pagamento: 'Cartão de Crédito', valor: 0 }]);
 
   // Auto-calculate total when base or discount changes
   useEffect(() => {
@@ -204,6 +207,11 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
     }
     
     setFormData(prev => ({ ...prev, valor_total: total.toFixed(2) }));
+    
+    // Auto-atualiza o primeiro pagamento para cobrir o total se houver só 1
+    if (pagamentos.length === 1) {
+      setPagamentos([{ forma_pagamento: pagamentos[0].forma_pagamento, valor: total }]);
+    }
   }, [formData.valor_base, formData.desconto, formData.is_birthday_discount]);
 
   // Carrega clientes e produtos quando o modal abre
@@ -359,20 +367,18 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
     return isArmacao && matchesSearch;
   });
 
+
+
   const checkCaixa = async () => {
     setCheckingCaixa(true);
     const [settingsData, caixa] = await Promise.all([
       storage.getSettings(),
-      storage.getCaixaAtual()
+      caixaService.buscarCaixaAtivo()
     ]);
     setSettings(settingsData);
     
-    // Bloqueia apenas se a trava for obrigatória nas configurações
-    if (settingsData.sistema.trava_caixa) {
-      setCaixaAberto(caixa);
-    } else {
-      setCaixaAberto(true); // Se não for obrigatória, "finge" que está aberto
-    }
+    // Bloqueia apenas se a trava for obrigatória nas configurações (mas agora é exigência do cliente ter o caixa aberto)
+    setCaixaAberto(caixa); 
     setCheckingCaixa(false);
   };
 
@@ -403,11 +409,59 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
         valor_total: parseFloat(formData.valor_total) || 0,
         criado_em: getNowISO()
       };
+      
+      const valorTotalRecebido = pagamentos.reduce((acc, p) => acc + Number(p.valor), 0);
+      if (Math.abs(valorTotalRecebido - saleToSave.valor_total) > 0.05) {
+        setLoading(false);
+        return toast.error(`A soma dos pagamentos (R$ ${valorTotalRecebido.toFixed(2)}) difere do total (R$ ${saleToSave.valor_total.toFixed(2)})`);
+      }
 
-      const result = await storage.registrarVenda(saleToSave);
+      // Prepara o VendaInput
+      const vendaInput: VendaInput = {
+        os_number: `OS-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`,
+        caixa_id: caixaAberto.id,
+        cliente_id: formData.cliente_id || null,
+        usuario_id: '00000000-0000-0000-0000-000000000000', // Mock do usuário logado
+        valor_bruto: parseFloat(formData.valor_base) || 0,
+        desconto: parseFloat(formData.desconto) || 0,
+        valor_liquido: saleToSave.valor_total,
+        metadata: {
+          paciente_nome: clienteNome,
+          paciente_cpf: clienteCpf,
+          paciente_whatsapp: clienteWhatsapp,
+          od_esferico: saleToSave.od_esferico,
+          od_cilindrico: saleToSave.od_cilindrico,
+          od_eixo: saleToSave.od_eixo,
+          od_dnp: saleToSave.od_dnp,
+          od_adicao: saleToSave.od_adicao,
+          oe_esferico: saleToSave.oe_esferico,
+          oe_cilindrico: saleToSave.oe_cilindrico,
+          oe_eixo: saleToSave.oe_eixo,
+          oe_dnp: saleToSave.oe_dnp,
+          oe_adicao: saleToSave.oe_adicao,
+          tipo_lente: formData.tipo_lente,
+          tratamento: formData.tratamento
+        },
+        itens: [
+          {
+            categoria_id: '00000000-0000-0000-0000-000000000000', // Categoria de Venda Geral
+            descricao: `LENTE ${formData.tipo_lente} ${formData.tratamento}`.trim() || 'PRODUTO ÓTICO',
+            quantidade: 1,
+            valor_unitario: saleToSave.valor_total,
+            valor_total: saleToSave.valor_total
+          }
+        ],
+        pagamentos: pagamentos.map(p => ({
+          forma_pagamento: p.forma_pagamento,
+          valor: p.valor
+        }))
+      };
 
-      toast.success('Venda Salva com Sucesso');
-      setSavedSale(result);
+      const result = await vendasService.salvarVenda(vendaInput);
+      
+      // Armazena a venda com formato compatível com o recibo
+      const saved = { ...saleToSave, id: result.id, os_number: result.os_number };
+      setSavedSale(saved);
       
       // Usa diretamente o client já selecionado (não precisa buscar de novo)
       // O state `client` já foi setado em handleSelectClient
@@ -446,6 +500,7 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
     setArmacaoSearch('');
     setShowLenteDropdown(false);
     setShowArmacaoDropdown(false);
+    setPagamentos([{ forma_pagamento: 'Cartão de Crédito', valor: 0 }]);
     onClose();
   };
 
@@ -749,18 +804,55 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                  <div className="space-y-4">
-                    <h4 className="text-xs font-bold text-white/20 uppercase tracking-widest border-b border-white/5 pb-2">Forma de Pagamento</h4>
-                    <select 
-                      className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-primary/50 text-white"
-                      value={formData.forma_pagamento}
-                      onChange={(e) => setFormData({...formData, forma_pagamento: e.target.value})}
+                    <h4 className="text-xs font-bold text-white/20 uppercase tracking-widest border-b border-white/5 pb-2">Formas de Pagamento</h4>
+                    
+                    {pagamentos.map((pagamento, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <select 
+                          className="flex-1 bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-primary/50 text-white"
+                          value={pagamento.forma_pagamento}
+                          onChange={(e) => {
+                            const newPags = [...pagamentos];
+                            newPags[index].forma_pagamento = e.target.value;
+                            setPagamentos(newPags);
+                          }}
+                        >
+                          <option className="bg-surface">Cartão de Crédito</option>
+                          <option className="bg-surface">Cartão de Débito</option>
+                          <option className="bg-surface">Pix</option>
+                          <option className="bg-surface">Dinheiro</option>
+                          <option className="bg-surface">Crediário Lis</option>
+                        </select>
+                        <input
+                          type="number"
+                          className="w-32 bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-primary/50 text-white"
+                          value={pagamento.valor}
+                          onChange={(e) => {
+                            const newPags = [...pagamentos];
+                            newPags[index].valor = parseFloat(e.target.value) || 0;
+                            setPagamentos(newPags);
+                          }}
+                          placeholder="0.00"
+                        />
+                        {pagamentos.length > 1 && (
+                          <button 
+                            className="p-3 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500/20"
+                            onClick={() => {
+                              setPagamentos(pagamentos.filter((_, i) => i !== index));
+                            }}
+                          >
+                            <X size={16} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    
+                    <button 
+                      onClick={() => setPagamentos([...pagamentos, { forma_pagamento: 'Pix', valor: 0 }])}
+                      className="w-full py-2 bg-white/5 border border-white/10 rounded-xl text-xs font-bold text-white/60 hover:text-white hover:bg-white/10 transition-colors"
                     >
-                      <option className="bg-surface">Cartão de Crédito</option>
-                      <option className="bg-surface">Cartão de Débito</option>
-                      <option className="bg-surface">Pix</option>
-                      <option className="bg-surface">Dinheiro</option>
-                      <option className="bg-surface">Crediário Lis</option>
-                    </select>
+                      + Adicionar outro pagamento
+                    </button>
 
                     <div className="flex items-center gap-2 pt-2">
                        <input 
