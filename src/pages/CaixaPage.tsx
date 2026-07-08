@@ -13,7 +13,7 @@ import {
   Calendar
 } from 'lucide-react';
 import { storage } from '../lib/storage';
-import { caixaService, Caixa } from '../lib/services/caixaService';
+import { caixaService, type Caixa } from '../lib/services/caixaService';
 import { movimentosService } from '../lib/services/movimentosService';
 import { toast } from 'sonner';
 import { openWhatsApp } from '../lib/whatsappUtils';

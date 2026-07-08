@@ -27,7 +27,7 @@ import PrintOS from './PrintOS';
 import PrintNFe from './PrintNFe';
 import { BotaoEnviarComprovante, gerarPdfRecibo } from './WhatsAppComprovante';
 import { caixaService } from '../lib/services/caixaService';
-import { vendasService, VendaInput } from '../lib/services/vendasService';
+import { vendasService, type VendaInput } from '../lib/services/vendasService';
 
 interface SaleModalProps {
   isOpen: boolean;
