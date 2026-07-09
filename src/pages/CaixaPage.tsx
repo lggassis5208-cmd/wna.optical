@@ -28,7 +28,7 @@ export default function CaixaPage() {
   const [abrirModal, setAbrirModal] = useState(false);
   const [saidaModal, setSaidaModal] = useState(false);
   const [entradaModal, setEntradaModal] = useState(false);
-  const [valorAbertura, setValorAbertura] = useState('');
+  const [valorAbertura, setValorAbertura] = useState('0.01');
   const [novaSaida, setNovaSaida] = useState({ descricao: '', valor: '', forma: 'Dinheiro' });
   const [novaEntrada, setNovaEntrada] = useState({ descricao: '', valor: '', forma: 'Dinheiro' });
 
@@ -452,6 +452,8 @@ export default function CaixaPage() {
               <label className="text-xs font-black text-white/20 uppercase tracking-widest ml-1">Saldo Inicial em Dinheiro</label>
               <input
                 type="number"
+                step="0.01"
+                min="0.01"
                 placeholder="R$ 0,00"
                 className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-2xl font-black text-white focus:outline-none focus:border-primary/50 transition-colors"
                 value={valorAbertura}
@@ -500,6 +502,8 @@ export default function CaixaPage() {
                   <label className="text-[10px] font-black text-white/30 uppercase tracking-widest ml-1">Valor da Retirada (R$)</label>
                   <input
                     type="number"
+                    step="0.01"
+                    min="0.01"
                     placeholder="0.00"
                     className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm text-white focus:outline-none focus:border-red-500/50"
                     value={novaSaida.valor}
@@ -561,6 +565,8 @@ export default function CaixaPage() {
                   <label className="text-[10px] font-black text-white/30 uppercase tracking-widest ml-1">Valor da Entrada (R$)</label>
                   <input
                     type="number"
+                    step="0.01"
+                    min="0.01"
                     placeholder="0.00"
                     className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm text-white focus:outline-none focus:border-green-500/50"
                     value={novaEntrada.valor}
