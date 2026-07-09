@@ -112,10 +112,10 @@ ALTER TABLE pagamentos_venda ENABLE ROW LEVEL SECURITY;
 ALTER TABLE itens_venda ENABLE ROW LEVEL SECURITY;
 ALTER TABLE movimentos_caixa ENABLE ROW LEVEL SECURITY;
 
--- Politicas basicas (Permitir tudo para auth anon/authenticated ou baseado em roles do projeto)
-CREATE POLICY "Permitir tudo para usuarios autenticados em categorias" ON categorias FOR ALL USING (auth.role() = 'authenticated');
-CREATE POLICY "Permitir tudo para usuarios autenticados em caixas" ON caixas FOR ALL USING (auth.role() = 'authenticated');
-CREATE POLICY "Permitir tudo para usuarios autenticados em vendas" ON vendas FOR ALL USING (auth.role() = 'authenticated');
-CREATE POLICY "Permitir tudo para usuarios autenticados em pagamentos_venda" ON pagamentos_venda FOR ALL USING (auth.role() = 'authenticated');
-CREATE POLICY "Permitir tudo para usuarios autenticados em itens_venda" ON itens_venda FOR ALL USING (auth.role() = 'authenticated');
-CREATE POLICY "Permitir tudo para usuarios autenticados em movimentos_caixa" ON movimentos_caixa FOR ALL USING (auth.role() = 'authenticated');
+-- Politicas basicas (Permitir acesso total por enquanto, pois o sistema de auth ainda não está restrito no client)
+CREATE POLICY "Permitir tudo em categorias" ON categorias FOR ALL USING (true);
+CREATE POLICY "Permitir tudo em caixas" ON caixas FOR ALL USING (true);
+CREATE POLICY "Permitir tudo em vendas" ON vendas FOR ALL USING (true);
+CREATE POLICY "Permitir tudo em pagamentos_venda" ON pagamentos_venda FOR ALL USING (true);
+CREATE POLICY "Permitir tudo em itens_venda" ON itens_venda FOR ALL USING (true);
+CREATE POLICY "Permitir tudo em movimentos_caixa" ON movimentos_caixa FOR ALL USING (true);

@@ -17,6 +17,9 @@ import { caixaService, type Caixa } from '../lib/services/caixaService';
 import { movimentosService } from '../lib/services/movimentosService';
 import { toast } from 'sonner';
 import { openWhatsApp } from '../lib/whatsappUtils';
+import HistoricoCaixasModal from '../components/HistoricoCaixasModal';
+import { categoriasService, type Categoria } from '../lib/services/categoriasService';
+import { Plus } from 'lucide-react';
 
 // Mock temporário para usuário (substituir por auth.user)
 const mockUsuarioId = '00000000-0000-0000-0000-000000000000';
@@ -28,9 +31,11 @@ export default function CaixaPage() {
   const [abrirModal, setAbrirModal] = useState(false);
   const [saidaModal, setSaidaModal] = useState(false);
   const [entradaModal, setEntradaModal] = useState(false);
+  const [historicoModal, setHistoricoModal] = useState(false);
   const [valorAbertura, setValorAbertura] = useState('0.01');
-  const [novaSaida, setNovaSaida] = useState({ descricao: '', valor: '', forma: 'Dinheiro' });
-  const [novaEntrada, setNovaEntrada] = useState({ descricao: '', valor: '', forma: 'Dinheiro' });
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [novaSaida, setNovaSaida] = useState({ descricao: '', valor: '', forma: 'Dinheiro', categoria_id: '' });
+  const [novaEntrada, setNovaEntrada] = useState({ descricao: '', valor: '', forma: 'Dinheiro', categoria_id: '' });
 
   const carregarCaixa = async () => {
     setLoading(true);
@@ -43,10 +48,29 @@ export default function CaixaPage() {
       } else {
         setMovimentos([]);
       }
+      const cats = await categoriasService.buscarCategorias();
+      setCategorias(cats);
     } catch (e) {
       console.error(e);
     }
     setLoading(false);
+  };
+
+  const handleAdicionarCategoria = async (tipo: 'DESPESA' | 'RECEITA') => {
+    const nome = window.prompt(`Nome da nova Categoria de ${tipo === 'DESPESA' ? 'Gasto' : 'Ganho'}:`);
+    if (!nome) return;
+    try {
+      const novaCat = await categoriasService.criarCategoria(nome, tipo);
+      setCategorias(prev => [...prev, novaCat].sort((a, b) => a.nome.localeCompare(b.nome)));
+      toast.success('Categoria adicionada!');
+      if (tipo === 'DESPESA') {
+        setNovaSaida({ ...novaSaida, categoria_id: novaCat.id });
+      } else {
+        setNovaEntrada({ ...novaEntrada, categoria_id: novaCat.id });
+      }
+    } catch (e: any) {
+      toast.error('Erro ao adicionar categoria.');
+    }
   };
 
   useEffect(() => {
@@ -93,11 +117,12 @@ export default function CaixaPage() {
         descricao: novaSaida.descricao,
         valor: Number(novaSaida.valor),
         forma_pagamento: novaSaida.forma,
-        usuario_id: mockUsuarioId
+        usuario_id: mockUsuarioId,
+        categoria_id: novaSaida.categoria_id || null
       });
       toast.success('Saída registrada com sucesso!');
       setSaidaModal(false);
-      setNovaSaida({ descricao: '', valor: '', forma: 'Dinheiro' });
+      setNovaSaida({ descricao: '', valor: '', forma: 'Dinheiro', categoria_id: '' });
       carregarCaixa();
     } catch (e: any) {
       toast.error(e.message);
@@ -116,11 +141,12 @@ export default function CaixaPage() {
         descricao: novaEntrada.descricao,
         valor: Number(novaEntrada.valor),
         forma_pagamento: novaEntrada.forma,
-        usuario_id: mockUsuarioId
+        usuario_id: mockUsuarioId,
+        categoria_id: novaEntrada.categoria_id || null
       });
       toast.success('Entrada avulsa registrada com sucesso!');
       setEntradaModal(false);
-      setNovaEntrada({ descricao: '', valor: '', forma: 'Dinheiro' });
+      setNovaEntrada({ descricao: '', valor: '', forma: 'Dinheiro', categoria_id: '' });
       carregarCaixa();
     } catch (e: any) {
       toast.error(e.message);
@@ -199,7 +225,10 @@ export default function CaixaPage() {
           </button>
         ) : (
           <div className="flex gap-3">
-            <button className="bg-white/5 border border-white/10 text-white font-bold px-4 py-3 rounded-2xl flex items-center gap-2 hover:bg-white/10 transition-all text-sm">
+            <button 
+              onClick={() => setHistoricoModal(true)}
+              className="bg-white/5 border border-white/10 text-white font-bold px-4 py-3 rounded-2xl flex items-center gap-2 hover:bg-white/10 transition-all text-sm"
+            >
               <Calendar size={18} />
               Histórico
             </button>
@@ -489,7 +518,25 @@ export default function CaixaPage() {
             <div className="p-8 space-y-6">
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-white/30 uppercase tracking-widest ml-1">Descrição do Gasto</label>
+                  <div className="flex justify-between items-center">
+                    <label className="text-[10px] font-black text-white/30 uppercase tracking-widest ml-1">Categoria</label>
+                    <button onClick={() => handleAdicionarCategoria('DESPESA')} className="text-[10px] text-primary hover:text-primary/80 font-bold flex items-center gap-1 transition-colors">
+                      <Plus size={12} /> Adicionar Nova
+                    </button>
+                  </div>
+                  <select
+                    className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm text-white focus:outline-none focus:border-red-500/50 appearance-none"
+                    value={novaSaida.categoria_id}
+                    onChange={(e) => setNovaSaida({ ...novaSaida, categoria_id: e.target.value })}
+                  >
+                    <option value="">Selecione a categoria...</option>
+                    {categorias.filter(c => c.tipo === 'DESPESA').map(c => (
+                      <option key={c.id} value={c.id}>{c.nome}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-white/30 uppercase tracking-widest ml-1">Descrição Adicional (Opcional)</label>
                   <input
                     type="text"
                     placeholder="Ex: Pagamento de Energia, Almoço..."
@@ -552,7 +599,25 @@ export default function CaixaPage() {
             <div className="p-8 space-y-6">
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-white/30 uppercase tracking-widest ml-1">Descrição / Origem</label>
+                  <div className="flex justify-between items-center">
+                    <label className="text-[10px] font-black text-white/30 uppercase tracking-widest ml-1">Categoria</label>
+                    <button onClick={() => handleAdicionarCategoria('RECEITA')} className="text-[10px] text-green-400 hover:text-green-300 font-bold flex items-center gap-1 transition-colors">
+                      <Plus size={12} /> Adicionar Nova
+                    </button>
+                  </div>
+                  <select
+                    className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm text-white focus:outline-none focus:border-green-500/50 appearance-none"
+                    value={novaEntrada.categoria_id}
+                    onChange={(e) => setNovaEntrada({ ...novaEntrada, categoria_id: e.target.value })}
+                  >
+                    <option value="">Selecione a categoria...</option>
+                    {categorias.filter(c => c.tipo === 'RECEITA').map(c => (
+                      <option key={c.id} value={c.id}>{c.nome}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-white/30 uppercase tracking-widest ml-1">Descrição / Origem (Opcional)</label>
                   <input
                     type="text"
                     placeholder="Ex: Recebimento Antigo, Empréstimo..."
@@ -598,6 +663,8 @@ export default function CaixaPage() {
           </div>
         </div>
       )}
+
+      <HistoricoCaixasModal isOpen={historicoModal} onClose={() => setHistoricoModal(false)} />
     </div>
   );
 }

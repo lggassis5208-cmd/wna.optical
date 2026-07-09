@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import DashboardPage from './pages/DashboardPage';
 import ClientsPage from './pages/ClientsPage';
+import CrmPage from './pages/CrmPage';
 import SalesPage from './pages/SalesPage';
 import AgendaPage from './pages/AgendaPage';
 import CaixaPage from './pages/CaixaPage';
@@ -177,6 +178,12 @@ function Layout() {
             active={location.pathname === '/clientes'} 
           />
           <NavItem 
+            to="/crm" 
+            icon={<MessageCircle size={20} />} 
+            label="CRM Pós-Venda" 
+            active={location.pathname === '/crm'} 
+          />
+          <NavItem 
             to="/agenda" 
             icon={<Calendar size={20} />} 
             label="Agenda" 
@@ -304,6 +311,7 @@ function App() {
         >
           <Route index element={<DashboardPage />} />
           <Route path="clientes" element={<ClientsPage />} />
+          <Route path="crm" element={<CrmPage />} />
           <Route path="vendas" element={<SalesPage />} />
           <Route path="agenda" element={<AgendaPage />} />
           <Route path="caixa" element={<CaixaPage />} />
