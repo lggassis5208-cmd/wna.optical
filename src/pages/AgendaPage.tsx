@@ -491,30 +491,86 @@ function AgendamentoModal({ isOpen, onClose }: { isOpen: boolean, onClose: () =>
           {!selectedClient ? (
             <div className="relative">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30" />
-              <input type="text" placeholder="Buscar paciente..." value={searchCpf} onChange={(e) => setSearchCpf(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-xl py-4 pl-12 pr-4 focus:outline-none focus:border-primary/50 text-white" />
+              <input 
+                type="text" 
+                placeholder="Buscar paciente por nome ou CPF..." 
+                value={searchCpf} 
+                onChange={(e) => setSearchCpf(e.target.value)} 
+                className="w-full bg-white/5 border border-white/10 rounded-xl py-4 pl-12 pr-4 focus:outline-none focus:border-primary/50 text-white" 
+              />
               {searchCpf.length > 1 && (
-                <div className="bg-white/5 border border-white/10 rounded-xl mt-2 max-h-[300px] overflow-auto">
-                  {filteredClients.map(c => (
-                    <div key={c.id} onClick={() => setSelectedClient(c)} className="p-4 border-b border-white/5 hover:bg-white/10 cursor-pointer">
-                      <p className="font-bold">{c.name || c.nome_completo}</p>
+                <div className="bg-surface border border-white/10 rounded-xl mt-2 max-h-[300px] overflow-auto shadow-2xl absolute w-full z-10">
+                  {filteredClients.length > 0 ? (
+                    filteredClients.map(c => (
+                      <div key={c.id} onClick={() => setSelectedClient(c)} className="p-4 border-b border-white/5 hover:bg-white/10 cursor-pointer transition-colors flex justify-between items-center group">
+                        <div>
+                          <p className="font-bold text-white group-hover:text-primary">{c.name || c.nome_completo}</p>
+                          <p className="text-xs text-white/40">{c.cpf || 'Sem CPF'} • {c.whatsapp || 'Sem WhatsApp'}</p>
+                        </div>
+                        <Plus size={16} className="text-white/20 group-hover:text-primary" />
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-6 text-center border-b border-white/5">
+                      <p className="text-white/40 text-sm mb-3">Nenhum paciente encontrado com "{searchCpf}"</p>
+                      <button 
+                        onClick={async () => {
+                          setLoading(true);
+                          try {
+                            const newClient = await storage.saveClient({
+                              nome_completo: searchCpf,
+                              cpf: '',
+                              whatsapp: '',
+                              canal_origem: 'agenda'
+                            });
+                            storage.getClients().then(setClients);
+                            setSelectedClient(newClient);
+                            toast.success('Cliente cadastrado rapidamente!');
+                          } catch (e) {
+                            toast.error('Erro ao cadastrar cliente.');
+                          } finally {
+                            setLoading(false);
+                          }
+                        }}
+                        className="bg-primary/10 text-primary border border-primary/20 px-4 py-2 rounded-lg text-sm font-bold hover:bg-primary/20 transition-all"
+                      >
+                        Cadastrar Novo Paciente
+                      </button>
                     </div>
-                  ))}
+                  )}
                 </div>
               )}
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="bg-primary/10 p-4 rounded-xl flex justify-between"><div><p className="text-xs text-primary font-bold uppercase">Selecionado</p><p className="font-bold">{selectedClient.name || selectedClient.nome_completo}</p></div><button onClick={() => setSelectedClient(null)} className="text-sm underline text-white/40 hover:text-white">Trocar</button></div>
-              <div className="grid grid-cols-2 gap-4">
-                <div><label className="text-sm font-bold block mb-1">Data</label><input type="date" value={formData.data} onChange={e => setFormData({...formData, data: e.target.value})} className="w-full bg-white/5 rounded-xl p-3 border border-white/10 color-scheme-dark" /></div>
-                <div><label className="text-sm font-bold block mb-1">Hora</label><input type="time" value={formData.horario} onChange={e => setFormData({...formData, horario: e.target.value})} className="w-full bg-white/5 rounded-xl p-3 border border-white/10 color-scheme-dark" /></div>
+              <div className="bg-primary/10 p-4 rounded-xl flex justify-between items-center border border-primary/20">
+                <div>
+                  <p className="text-[10px] text-primary font-black uppercase tracking-widest mb-1">Paciente Selecionado</p>
+                  <p className="font-bold text-white text-lg">{selectedClient.name || selectedClient.nome_completo}</p>
+                  <p className="text-xs text-white/60 mt-1">{selectedClient.cpf ? `CPF: ${selectedClient.cpf}` : 'Sem CPF'} • {selectedClient.whatsapp ? `WhatsApp: ${selectedClient.whatsapp}` : 'Sem WhatsApp'}</p>
+                </div>
+                <button onClick={() => setSelectedClient(null)} className="text-sm px-4 py-2 bg-black/40 rounded-lg font-bold text-white/70 hover:text-white hover:bg-black/60 transition-colors">
+                  Trocar
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-4 pt-2">
+                <div>
+                  <label className="text-xs font-black text-white/40 uppercase tracking-widest block mb-2">Data da Consulta</label>
+                  <input type="date" value={formData.data} onChange={e => setFormData({...formData, data: e.target.value})} className="w-full bg-white/5 rounded-xl p-3.5 border border-white/10 text-white focus:border-primary/50 focus:outline-none transition-colors color-scheme-dark" />
+                </div>
+                <div>
+                  <label className="text-xs font-black text-white/40 uppercase tracking-widest block mb-2">Horário</label>
+                  <input type="time" value={formData.horario} onChange={e => setFormData({...formData, horario: e.target.value})} className="w-full bg-white/5 rounded-xl p-3.5 border border-white/10 text-white focus:border-primary/50 focus:outline-none transition-colors color-scheme-dark" />
+                </div>
               </div>
             </div>
           )}
         </div>
-        <div className="p-6 border-t border-white/5 flex justify-end gap-3">
-          <button onClick={onClose} className="px-6 py-2 rounded-xl bg-white/5 font-bold text-white/40 hover:text-white">Cancelar</button>
-          <button onClick={handleSave} disabled={loading || !selectedClient} className="px-8 py-2 rounded-xl bg-primary text-black font-black flex gap-2">{loading ? <Loader2 className="animate-spin" size={20}/> : 'Salvar'}</button>
+        <div className="p-6 border-t border-white/5 flex justify-end gap-3 bg-black/20 rounded-b-3xl">
+          <button onClick={onClose} className="px-6 py-2.5 rounded-xl bg-transparent font-bold text-white/40 hover:text-white transition-colors">Cancelar</button>
+          <button onClick={handleSave} disabled={loading || !selectedClient} className="px-8 py-2.5 rounded-xl bg-primary hover:bg-yellow-400 text-black font-black flex items-center justify-center min-w-[120px] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_15px_rgba(255,191,0,0.2)]">
+            {loading ? <Loader2 className="animate-spin" size={20}/> : 'Salvar Agendamento'}
+          </button>
         </div>
       </div>
     </div>
