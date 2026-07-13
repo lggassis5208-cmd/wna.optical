@@ -3,7 +3,7 @@ import { supabase } from '../supabase';
 export type Operator = 
   | 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'between'
   | 'contains' | 'starts_with' | 'in' | 'is_null' | 'is_not_null'
-  | 'is_true' | 'is_false' | 'last_x_days' | 'last_x_months';
+  | 'is_true' | 'is_false' | 'last_x_days' | 'last_x_months' | 'next_x_days';
 
 export type FieldType = 'number' | 'text' | 'date' | 'enum' | 'boolean';
 
@@ -100,6 +100,7 @@ export const OPERATORS_BY_TYPE: Record<FieldType, { value: Operator; label: stri
   date: [
     { value: 'last_x_days', label: 'Nos últimos X dias' },
     { value: 'last_x_months', label: 'Nos últimos X meses' },
+    { value: 'next_x_days', label: 'Nos próximos X dias' },
     { value: 'lt', label: 'Antes de (Data)' },
     { value: 'gt', label: 'Depois de (Data)' },
     { value: 'is_null', label: 'Não preenchido' },
@@ -140,6 +141,9 @@ function buildFilterString(node: Rule | RuleGroup): string {
     }
     if (operator === 'last_x_months') {
       return `and(${field}.gte.today-${value}months,${field}.lte.today)`;
+    }
+    if (operator === 'next_x_days') {
+      return `and(${field}.gte.today,${field}.lte.today+${value}days)`;
     }
 
     // Padrões

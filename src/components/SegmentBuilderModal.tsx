@@ -12,39 +12,60 @@ import {
   type EvaluationResult
 } from '../lib/services/segmentosService';
 
+import { Calendar, Clock, Star, Users as UsersIcon } from 'lucide-react';
+
 interface SegmentBuilderModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-const TEMPLATES: Record<string, RuleGroup> = {
-  inativos_12m: {
-    type: 'group',
-    condition: 'AND',
-    rules: [
-      { type: 'rule', field: 'dias_ultima_compra', operator: 'gte', value: 365 },
-      { type: 'rule', field: 'status', operator: 'neq', value: 'inativo' }
-    ]
+const TEMPLATES = [
+  {
+    id: 'inativos',
+    title: 'Inativos há X dias',
+    description: 'Encontre clientes que não compram há algum tempo.',
+    icon: <Clock className="text-blue-400" size={24} />,
+    hasRelativeDays: true,
+    defaultDays: 180,
+    buildRule: (days: number): RuleGroup => ({
+      type: 'group', condition: 'AND', rules: [
+        { type: 'rule', field: 'dias_ultima_compra', operator: 'gte', value: days },
+        { type: 'rule', field: 'status', operator: 'neq', value: 'inativo' }
+      ]
+    })
   },
-  aniversariantes_mes: {
-    type: 'group',
-    condition: 'AND',
-    rules: [
-      { type: 'rule', field: 'aniversariante_mes', operator: 'is_true', value: true }
-    ]
+  {
+    id: 'recall_receita',
+    title: 'Receitas Vencendo',
+    description: 'Clientes cujas receitas vencem nos próximos X dias.',
+    icon: <Calendar className="text-red-400" size={24} />,
+    hasRelativeDays: true,
+    defaultDays: 30,
+    buildRule: (days: number): RuleGroup => ({
+      type: 'group', condition: 'AND', rules: [
+        { type: 'rule', field: 'validade_receita', operator: 'next_x_days', value: days },
+        { type: 'rule', field: 'tipo_lente', operator: 'is_not_null', value: null }
+      ]
+    })
   },
-  recall_receita: {
-    type: 'group',
-    condition: 'AND',
-    rules: [
-      { type: 'rule', field: 'validade_receita', operator: 'lt', value: 'today' },
-      { type: 'rule', field: 'tipo_lente', operator: 'is_not_null', value: null }
-    ]
+  {
+    id: 'vip',
+    title: 'Clientes VIP',
+    description: 'Compradores com alto Ticket Médio e LTV.',
+    icon: <Star className="text-yellow-400" size={24} />,
+    hasRelativeDays: false,
+    buildRule: (): RuleGroup => ({
+      type: 'group', condition: 'AND', rules: [
+        { type: 'rule', field: 'ticket_medio', operator: 'gte', value: 1000 },
+        { type: 'rule', field: 'num_compras', operator: 'gte', value: 2 }
+      ]
+    })
   }
-};
+];
 
 export default function SegmentBuilderModal({ isOpen, onClose, onSuccess }: SegmentBuilderModalProps) {
+  const [step, setStep] = useState<1 | 2>(1);
   const [loading, setLoading] = useState(false);
   const [evaluating, setEvaluating] = useState(false);
   const [nome, setNome] = useState('');
@@ -53,6 +74,10 @@ export default function SegmentBuilderModal({ isOpen, onClose, onSuccess }: Segm
   
   const [rootGroup, setRootGroup] = useState<RuleGroup>({ type: 'group', condition: 'AND', rules: [] });
   const [matchResult, setMatchResult] = useState<EvaluationResult | null>(null);
+
+  // States for template selection
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [templateDays, setTemplateDays] = useState<number>(30);
 
   const hasSensitiveData = useMemo(() => {
     let sensitive = false;
@@ -68,7 +93,48 @@ export default function SegmentBuilderModal({ isOpen, onClose, onSuccess }: Segm
     return sensitive;
   }, [rootGroup]);
 
+  // Reset on open
+  useMemo(() => {
+    if (isOpen) {
+      setStep(1);
+      setNome('');
+      setRootGroup({ type: 'group', condition: 'AND', rules: [] });
+      setMatchResult(null);
+      setSelectedTemplateId(null);
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
+
+  const handleStartCustom = () => {
+    setRootGroup({ type: 'group', condition: 'AND', rules: [] });
+    setNome('');
+    setStep(2);
+  };
+
+  const handleSelectTemplate = (templateId: string) => {
+    setSelectedTemplateId(templateId);
+    const tpl = TEMPLATES.find(t => t.id === templateId);
+    if (tpl) {
+      if (tpl.hasRelativeDays) {
+        setTemplateDays(tpl.defaultDays || 30);
+      } else {
+        // Go straight to step 2 if no relative days needed
+        setRootGroup(tpl.buildRule(0));
+        setNome(tpl.title);
+        setStep(2);
+      }
+    }
+  };
+
+  const handleConfirmTemplate = () => {
+    const tpl = TEMPLATES.find(t => t.id === selectedTemplateId);
+    if (tpl) {
+      setRootGroup(tpl.buildRule(templateDays));
+      setNome(`${tpl.title} (${templateDays} dias)`);
+      setStep(2);
+    }
+  };
 
   const handleEvaluate = async () => {
     if (rootGroup.rules.length === 0) return;
@@ -241,7 +307,7 @@ export default function SegmentBuilderModal({ isOpen, onClose, onSuccess }: Segm
             />
           ) : (
             <input
-              type={fieldDef.type === 'number' ? 'number' : 'text'}
+              type={['last_x_days', 'last_x_months', 'next_x_days'].includes(node.operator) ? 'number' : fieldDef.type === 'number' ? 'number' : 'text'}
               value={node.value}
               onChange={(e) => updateNode(path, { ...node, value: e.target.value })}
               className="bg-black border border-white/10 rounded-md p-2 text-sm text-white flex-1"
@@ -270,33 +336,76 @@ export default function SegmentBuilderModal({ isOpen, onClose, onSuccess }: Segm
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          <div className="grid grid-cols-3 gap-4">
-            <div className="col-span-2">
+          {step === 1 ? (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {TEMPLATES.map(tpl => (
+                  <div 
+                    key={tpl.id} 
+                    className={`bg-white/5 border ${selectedTemplateId === tpl.id ? 'border-primary' : 'border-white/10'} p-5 rounded-2xl hover:bg-white/10 transition-all cursor-pointer group relative`}
+                    onClick={() => handleSelectTemplate(tpl.id)}
+                  >
+                    <div className="flex gap-4">
+                      <div className="p-3 bg-black/40 rounded-xl group-hover:scale-110 transition-transform">{tpl.icon}</div>
+                      <div>
+                        <h4 className="font-bold text-white mb-1">{tpl.title}</h4>
+                        <p className="text-xs text-white/50 leading-relaxed">{tpl.description}</p>
+                      </div>
+                    </div>
+                    {selectedTemplateId === tpl.id && <div className="absolute inset-0 bg-primary/5 rounded-2xl pointer-events-none" />}
+                  </div>
+                ))}
+              </div>
+              
+              {selectedTemplateId && TEMPLATES.find(t => t.id === selectedTemplateId)?.hasRelativeDays && (
+                <div className="mt-2 p-6 bg-primary/10 border border-primary/20 rounded-2xl animate-in fade-in slide-in-from-bottom-4">
+                  <h4 className="font-bold text-primary mb-2">Configurar {TEMPLATES.find(t => t.id === selectedTemplateId)?.title}</h4>
+                  <div className="flex items-end gap-4">
+                    <div className="flex-1">
+                      <label className="text-xs font-bold text-primary/70 uppercase tracking-widest block mb-1">Período (em dias)</label>
+                      <input 
+                        type="number" 
+                        value={templateDays} 
+                        onChange={e => setTemplateDays(Number(e.target.value))} 
+                        className="w-full bg-black/40 border border-primary/30 rounded-xl p-3 text-white focus:border-primary focus:outline-none transition-colors"
+                      />
+                    </div>
+                    <button onClick={handleConfirmTemplate} className="bg-primary text-black font-black px-6 py-3 rounded-xl hover:bg-yellow-400 transition-colors">
+                      Continuar
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-center pt-8 border-t border-white/5">
+                <button 
+                  onClick={handleStartCustom}
+                  className="px-8 py-4 border-2 border-primary/20 text-primary font-bold rounded-xl hover:bg-primary/10 hover:border-primary/40 transition-all flex items-center gap-3"
+                >
+                  <Plus size={24} />
+                  Criar Novo Público Personalizado
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
+              <div className="flex justify-between items-center bg-black/20 p-4 rounded-xl border border-white/5 mb-6">
+            <div className="flex-1">
               <label className="text-xs font-bold text-white/40 uppercase tracking-widest block mb-2">Nome do Segmento</label>
               <input 
                 type="text" 
                 value={nome} 
                 onChange={e => setNome(e.target.value)} 
                 placeholder="Ex: Inativos +6 meses"
-                className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white focus:border-primary/50 focus:outline-none transition-colors"
+                className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white focus:border-primary/50 focus:outline-none transition-colors"
               />
             </div>
-            <div>
-              <label className="text-xs font-bold text-white/40 uppercase tracking-widest block mb-2">Templates Rápidos</label>
-              <select 
-                onChange={(e) => {
-                  if (e.target.value && TEMPLATES[e.target.value]) {
-                    setRootGroup(TEMPLATES[e.target.value]);
-                  }
-                }}
-                className="w-full bg-primary/5 text-primary border border-primary/20 rounded-xl p-4 font-bold focus:outline-none cursor-pointer"
-              >
-                <option value="">Carregar Template...</option>
-                <option value="inativos_12m">Inativos há +12 meses</option>
-                <option value="aniversariantes_mes">Aniversariantes do Mês</option>
-                <option value="recall_receita">Recall (Receita Vencendo)</option>
-              </select>
-            </div>
+            <button 
+              onClick={() => setStep(1)} 
+              className="ml-4 px-4 py-3 mt-6 text-sm bg-white/5 rounded-xl hover:bg-white/10 transition-colors text-white/70"
+            >
+              Trocar Template
+            </button>
           </div>
 
           {hasSensitiveData && (
@@ -361,24 +470,29 @@ export default function SegmentBuilderModal({ isOpen, onClose, onSuccess }: Segm
               )}
             </div>
           )}
-
+            </div>
+          )}
         </div>
 
         <div className="p-6 border-t border-white/5 flex justify-between items-center bg-black/20">
-          <button 
-            onClick={handleEvaluate} 
-            disabled={evaluating || rootGroup.rules.length === 0}
-            className="px-6 py-2.5 rounded-xl bg-white/5 font-bold text-white hover:bg-white/10 transition-colors flex items-center gap-2"
-          >
-            {evaluating ? <Loader2 className="animate-spin" size={18}/> : <Users size={18} />}
-            Calcular Público
-          </button>
+          {step === 2 ? (
+            <button 
+              onClick={handleEvaluate} 
+              disabled={evaluating || rootGroup.rules.length === 0}
+              className="px-6 py-2.5 rounded-xl bg-white/5 font-bold text-white hover:bg-white/10 transition-colors flex items-center gap-2"
+            >
+              {evaluating ? <Loader2 className="animate-spin" size={18}/> : <UsersIcon size={18} />}
+              Calcular Público
+            </button>
+          ) : <div />}
           
           <div className="flex gap-3">
             <button onClick={onClose} className="px-6 py-2.5 rounded-xl bg-transparent font-bold text-white/40 hover:text-white transition-colors">Cancelar</button>
-            <button onClick={handleSave} disabled={loading} className="px-8 py-2.5 rounded-xl bg-primary hover:bg-yellow-400 text-black font-black flex items-center justify-center gap-2 transition-all shadow-[0_0_15px_rgba(255,191,0,0.2)]">
-              {loading ? <Loader2 className="animate-spin" size={20}/> : 'Salvar Segmento'}
-            </button>
+            {step === 2 && (
+              <button onClick={handleSave} disabled={loading} className="px-8 py-2.5 rounded-xl bg-primary hover:bg-yellow-400 text-black font-black flex items-center justify-center gap-2 transition-all shadow-[0_0_15px_rgba(255,191,0,0.2)]">
+                {loading ? <Loader2 className="animate-spin" size={20}/> : 'Salvar Segmento'}
+              </button>
+            )}
           </div>
         </div>
       </div>
