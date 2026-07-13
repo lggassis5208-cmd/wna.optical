@@ -13,20 +13,32 @@ export default function SegmentosPage() {
 
   const loadSegmentos = async () => {
     setLoading(true);
-    const data = await segmentosService.getSegmentos();
-    // Para cada segmento, calcular o tamanho real de clientes no momento
-    // Em um sistema real massivo, essa contagem poderia vir pré-calculada num job, 
-    // mas para a Fase 1 chamaremos o count.
-    
-    // Processamento paralelo para as contagens
-    const countPromises = data.map(async (seg) => {
-      const count = await segmentosService.evaluateSegmentoCount(seg.regras);
-      return { ...seg, count };
-    });
-    
-    const dataWithCounts = await Promise.all(countPromises);
-    setSegmentos(dataWithCounts as any);
-    setLoading(false);
+    try {
+      const data = await segmentosService.getSegmentos();
+      
+      const countPromises = data.map(async (seg) => {
+        try {
+          // Backward compatibility para segmentos antigos que eram um array
+          const regrasSeguras = Array.isArray(seg.regras) 
+            ? { type: 'group', condition: 'AND', rules: seg.regras } as any
+            : seg.regras;
+            
+          const result = await segmentosService.evaluateSegmentoCount(regrasSeguras);
+          return { ...seg, count: result.count };
+        } catch (e) {
+          console.error(`Erro ao processar segmento ${seg.id}:`, e);
+          return { ...seg, count: 0 };
+        }
+      });
+      
+      const dataWithCounts = await Promise.all(countPromises);
+      setSegmentos(dataWithCounts as any);
+    } catch (error) {
+      console.error('Erro ao carregar segmentos:', error);
+      toast.error('Falha ao carregar lista de segmentos.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {

@@ -229,7 +229,10 @@ export const segmentosService = {
       const clientIds = clients.map(c => c.cliente_id);
       const { data: sampleData, error: rpcError } = await supabase.rpc('mask_sample_data', { client_ids: clientIds });
       
-      if (rpcError) throw rpcError;
+      if (rpcError) {
+        console.warn('RPC mask_sample_data não encontrada ou falhou. O banco de dados está desatualizado.', rpcError);
+        return { count: count || 0, sample: [] };
+      }
 
       return { count: count || 0, sample: sampleData || [] };
     } catch (e) {
