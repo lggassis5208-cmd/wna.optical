@@ -3,6 +3,8 @@ import { X, User, Activity, ShoppingBag, Phone, FileText, ChevronRight } from 'l
 import { storage } from '../lib/storage';
 import { formatDate } from '../lib/dateUtils';
 import { openWhatsApp } from '../lib/whatsappUtils';
+import { crmEventsService, type CrmEvent } from '../lib/services/crmEventsService';
+import { MessageCircle, Megaphone, CalendarCheck, Star } from 'lucide-react';
 
 interface ClientProfileModalProps {
   isOpen: boolean;
@@ -11,9 +13,10 @@ interface ClientProfileModalProps {
 }
 
 export default function ClientProfileModal({ isOpen, onClose, clientId }: ClientProfileModalProps) {
-  const [activeTab, setActiveTab] = useState<'dados' | 'clinico' | 'compras'>('dados');
+  const [activeTab, setActiveTab] = useState<'dados' | 'clinico' | 'compras' | 'crm'>('dados');
   const [client, setClient] = useState<any>(null);
   const [sales, setSales] = useState<any[]>([]);
+  const [crmEvents, setCrmEvents] = useState<CrmEvent[]>([]);
 
   useEffect(() => {
     if (isOpen && clientId) {
@@ -30,6 +33,9 @@ export default function ClientProfileModal({ isOpen, onClose, clientId }: Client
     // Ordenar por data decrescente
     clientSales.sort((a: any, b: any) => new Date(b.criado_em).getTime() - new Date(a.criado_em).getTime());
     setSales(clientSales);
+
+    const events = await crmEventsService.getEventsByClient(id);
+    setCrmEvents(events);
   };
 
   if (!isOpen || !client) return null;
@@ -86,6 +92,12 @@ export default function ClientProfileModal({ isOpen, onClose, clientId }: Client
             icon={<ShoppingBag size={18} />} 
             label="Histórico de Compras" 
           />
+          <TabButton 
+            active={activeTab === 'crm'} 
+            onClick={() => setActiveTab('crm')} 
+            icon={<MessageCircle size={18} />} 
+            label="CRM & Relacionamento" 
+          />
         </div>
 
         {/* Content */}
@@ -112,6 +124,14 @@ export default function ClientProfileModal({ isOpen, onClose, clientId }: Client
                   </div>
                 </div>
                 <DataCard label="Data de Nascimento" value={client.data_nascimento ? formatDate(client.data_nascimento) : 'Não informado'} />
+                
+                <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
+                  <p className="text-[10px] text-white/40 font-black uppercase tracking-widest mb-2">Consentimento & Marketing</p>
+                  <div className="flex flex-col gap-2">
+                    <p className="text-sm">Origem: <span className="font-bold text-primary">{client.canal_origem || 'Loja Física'}</span></p>
+                    <p className="text-sm">Marketing: {client.consentimento_marketing ? <span className="text-green-500 font-bold">Autorizado</span> : <span className="text-red-500 font-bold">Negado</span>}</p>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -214,6 +234,47 @@ export default function ClientProfileModal({ isOpen, onClose, clientId }: Client
                     </div>
                   </div>
                 ))
+              )}
+            </div>
+          )}
+
+          {/* ABA 4: CRM & RELACIONAMENTO */}
+          {activeTab === 'crm' && (
+            <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
+              <div className="flex justify-between items-center bg-primary/5 p-4 rounded-2xl border border-primary/20">
+                <div className="flex items-center gap-3">
+                  <Star className="text-primary" size={24} />
+                  <div>
+                    <p className="font-bold text-white">Linha do Tempo CRM</p>
+                    <p className="text-xs text-white/50">Histórico de comunicações e relacionamento</p>
+                  </div>
+                </div>
+              </div>
+
+              {crmEvents.length === 0 ? (
+                <div className="text-center py-12 border-2 border-dashed border-white/10 rounded-3xl">
+                  <MessageCircle size={48} className="mx-auto text-white/20 mb-4" />
+                  <p className="text-white/40">Nenhum evento de relacionamento registrado.</p>
+                </div>
+              ) : (
+                <div className="relative border-l border-white/10 ml-4 space-y-6 pb-4">
+                  {crmEvents.map(event => (
+                    <div key={event.id} className="relative pl-6">
+                      <div className="absolute -left-1.5 top-1.5 w-3 h-3 rounded-full bg-primary ring-4 ring-background" />
+                      <div className="bg-white/[0.02] border border-white/5 p-4 rounded-2xl">
+                        <div className="flex justify-between items-start mb-2">
+                          <p className="font-bold text-sm text-primary uppercase tracking-widest">{event.tipo_evento.replace('_', ' ')}</p>
+                          <span className="text-xs text-white/40 font-mono">{formatDate(event.criado_em!)}</span>
+                        </div>
+                        {event.payload && (
+                          <pre className="text-xs text-white/60 bg-black/20 p-2 rounded-lg mt-2 overflow-x-auto">
+                            {JSON.stringify(event.payload, null, 2)}
+                          </pre>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           )}

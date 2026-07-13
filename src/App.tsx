@@ -33,6 +33,8 @@ import LoginPage from './pages/LoginPage';
 import TestAutomatedPage from './pages/TestAutomatedPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import SimularImpressaoNota from './components/SimularImpressaoNota';
+import SegmentosPage from './pages/SegmentosPage';
+import CampanhasPage from './pages/CampanhasPage';
 import { notificationService } from './lib/notificationService';
 import type { AppNotification } from './lib/notificationService';
 import { openWhatsApp } from './lib/whatsappUtils';
@@ -40,7 +42,8 @@ import { toast } from 'sonner';
 import { 
   MessageCircle,
   CheckCircle,
-  Gift
+  Gift,
+  Filter
 } from 'lucide-react';
 
 function NotificationBell() {
@@ -176,6 +179,18 @@ function Layout() {
             icon={<Users size={20} />} 
             label="Clientes" 
             active={location.pathname === '/clientes'} 
+          />
+          <NavItem 
+            to="/segmentos" 
+            icon={<Filter size={20} />} 
+            label="Segmentos (Motor)" 
+            active={location.pathname === '/segmentos'} 
+          />
+          <NavItem 
+            to="/campanhas" 
+            icon={<MessageCircle size={20} />} 
+            label="Campanhas WhatsApp" 
+            active={location.pathname === '/campanhas'} 
           />
           <NavItem 
             to="/crm" 
@@ -320,6 +335,8 @@ function App() {
           <Route path="fiscal" element={<FiscalPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="testes" element={<TestAutomatedPage />} />
+          <Route path="segmentos" element={<SegmentosPage />} />
+          <Route path="campanhas" element={<CampanhasPage />} />
           <Route path="*" element={<div className="flex items-center justify-center h-full text-white/20 italic">Módulo em desenvolvimento...</div>} />
         </Route>
       </Routes>

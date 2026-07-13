@@ -1,30 +1,45 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Lock, User, Eye, EyeOff, LogIn } from 'lucide-react';
+import { Lock, User, Eye, EyeOff, LogIn, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '../lib/supabase';
 
 export default function LoginPage() {
+  const [isRegistering, setIsRegistering] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    // Simulated login
-    setTimeout(() => {
-      if (email === 'admin@oticalis.com' && password === 'admin123') {
-        localStorage.setItem('lis_auth', 'true');
-        toast.success('Bem-vindo à Ótica Lis!');
-        navigate('/');
+    try {
+      if (isRegistering) {
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+        });
+        if (error) throw error;
+        toast.success('Conta criada com sucesso! Faça login para continuar.');
+        setIsRegistering(false);
       } else {
-        toast.error('Credenciais inválidas. Tente admin@oticalis.com / admin123');
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (error) throw error;
+        localStorage.setItem('lis_auth', 'true'); // mantém para retrocompatibilidade
+        toast.success('Autenticado com sucesso!');
+        navigate('/');
       }
+    } catch (e: any) {
+      toast.error(e.message || 'Erro na autenticação.');
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
   return (
@@ -42,7 +57,7 @@ export default function LoginPage() {
         </div>
 
         <div className="bg-surface/50 backdrop-blur-xl border border-white/10 p-8 rounded-[2.5rem] shadow-2xl">
-          <form onSubmit={handleLogin} className="space-y-6">
+          <form onSubmit={handleAuth} className="space-y-6">
             <div className="space-y-2">
               <label className="text-xs font-bold text-white/30 uppercase tracking-widest ml-1">E-mail de Acesso</label>
               <div className="relative group">
@@ -87,15 +102,25 @@ export default function LoginPage() {
             >
               {loading ? <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin" /> : (
                 <>
-                  Entrar no Sistema
-                  <LogIn size={20} />
+                  {isRegistering ? 'Criar Conta' : 'Entrar no Sistema'}
+                  {isRegistering ? <UserPlus size={20} /> : <LogIn size={20} />}
                 </>
               )}
             </button>
           </form>
 
-          <p className="text-center text-xs text-white/20 mt-8">
-            Acesso restrito a colaboradores autorizados da Unidade Matriz.
+          <div className="mt-6 text-center">
+            <button 
+              type="button"
+              onClick={() => setIsRegistering(!isRegistering)}
+              className="text-xs text-white/40 hover:text-primary transition-colors"
+            >
+              {isRegistering ? 'Já tem uma conta? Faça Login' : 'Nova Ótica? Crie sua conta'}
+            </button>
+          </div>
+
+          <p className="text-center text-xs text-white/20 mt-4">
+            Acesso restrito a colaboradores autorizados.
           </p>
         </div>
 

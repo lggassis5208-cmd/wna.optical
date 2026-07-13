@@ -30,7 +30,9 @@ export const storage = {
           cpf: client.cpf || '',
           whatsapp: (client.whatsapp || '').replace(/\D/g, ''),
           data_nascimento: client.data_nascimento || null,
-          lis_score: client.lis_score || 850
+          lis_score: client.lis_score || 850,
+          canal_origem: client.canal_origem || 'loja_fisica',
+          consentimento_marketing: client.consentimento_marketing !== false
         };
         const { data, error } = await supabase.from('clientes').insert([row]).select();
         if (!error && data) return data[0];

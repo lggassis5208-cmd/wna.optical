@@ -8,7 +8,9 @@ import {
   ShieldCheck,
   Search,
   Loader2,
-  Clock
+  Clock,
+  Megaphone,
+  CheckSquare
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { storage } from '../lib/storage';
@@ -31,7 +33,9 @@ export default function ClientModal({ isOpen, onClose }: ClientModalProps) {
     cidade: '',
     uf: '',
     numero: '',
-    data_nascimento: ''
+    data_nascimento: '',
+    canal_origem: 'loja_fisica',
+    consentimento_marketing: true
   });
 
   useEffect(() => {
@@ -178,6 +182,47 @@ export default function ClientModal({ isOpen, onClose }: ClientModalProps) {
                     />
                   </div>
                 </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-white/40 ml-1">Canal de Origem</label>
+                  <div className="relative">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20">
+                      <Megaphone size={16} />
+                    </div>
+                    <select 
+                      className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:border-primary/50 transition-colors text-white appearance-none"
+                      value={formData.canal_origem}
+                      onChange={(e) => setFormData({...formData, canal_origem: e.target.value})}
+                    >
+                      <option value="loja_fisica" className="bg-black">Loja Física</option>
+                      <option value="google_ads" className="bg-black">Google Ads</option>
+                      <option value="meta_ads" className="bg-black">Instagram/Facebook Ads</option>
+                      <option value="indicacao" className="bg-black">Indicação</option>
+                      <option value="outro" className="bg-black">Outro</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="md:col-span-2 pt-2">
+                  <label className="flex items-center gap-3 cursor-pointer group bg-white/5 border border-white/10 p-3 rounded-xl hover:bg-white/10 transition-colors">
+                    <div className="relative flex items-center justify-center">
+                      <input 
+                        type="checkbox" 
+                        className="peer sr-only"
+                        checked={formData.consentimento_marketing}
+                        onChange={(e) => setFormData({...formData, consentimento_marketing: e.target.checked})}
+                      />
+                      <div className="w-5 h-5 border-2 border-white/30 rounded flex items-center justify-center peer-checked:bg-primary peer-checked:border-primary transition-colors">
+                        <CheckSquare size={14} className="text-black opacity-0 peer-checked:opacity-100 transition-opacity" />
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-white group-hover:text-primary transition-colors">Consentimento de Marketing</p>
+                      <p className="text-xs text-white/40">Aceita receber lembretes de renovação de receita e ofertas.</p>
+                    </div>
+                  </label>
+                </div>
+
               </div>
             </div>
 
