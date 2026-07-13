@@ -13,6 +13,7 @@ import {
   isSameMonth, isToday, parseISO, getDay, isBefore, isSameDay
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useNavigate } from 'react-router-dom';
 
 type ViewMode = 'list' | 'calendar' | 'kanban';
 
@@ -432,6 +433,7 @@ function PushNotificationModal({ exame, onClose }: { exame: any, onClose: () => 
 // MODAL DE NOVO AGENDAMENTO (Bloqueio Quartas e Sextas)
 // ==========================================
 function AgendamentoModal({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [clients, setClients] = useState<any[]>([]);
   const [searchCpf, setSearchCpf] = useState('');
@@ -474,6 +476,7 @@ function AgendamentoModal({ isOpen, onClose }: { isOpen: boolean, onClose: () =>
       });
       toast.success('Agendado com sucesso!');
       onClose();
+      navigate('/clientes');
     } catch (e) {
       toast.error('Erro ao agendar.');
     } finally {
@@ -511,31 +514,56 @@ function AgendamentoModal({ isOpen, onClose }: { isOpen: boolean, onClose: () =>
                       </div>
                     ))
                   ) : (
-                    <div className="p-6 text-center border-b border-white/5">
-                      <p className="text-white/40 text-sm mb-3">Nenhum paciente encontrado com "{searchCpf}"</p>
-                      <button 
-                        onClick={async () => {
-                          setLoading(true);
-                          try {
-                            const newClient = await storage.saveClient({
-                              nome_completo: searchCpf,
-                              cpf: '',
-                              whatsapp: '',
-                              canal_origem: 'agenda'
-                            });
-                            storage.getClients().then(setClients);
-                            setSelectedClient(newClient);
-                            toast.success('Cliente cadastrado rapidamente!');
-                          } catch (e) {
-                            toast.error('Erro ao cadastrar cliente.');
-                          } finally {
-                            setLoading(false);
-                          }
-                        }}
-                        className="bg-primary/10 text-primary border border-primary/20 px-4 py-2 rounded-lg text-sm font-bold hover:bg-primary/20 transition-all"
-                      >
-                        Cadastrar Novo Paciente
-                      </button>
+                    <div className="p-6 border-b border-white/5">
+                      <p className="text-white/40 text-sm mb-4 text-center">Nenhum paciente encontrado com "{searchCpf}"</p>
+                      
+                      <div className="bg-black/20 p-4 rounded-xl border border-white/5 space-y-3">
+                        <p className="text-xs font-bold text-primary uppercase tracking-widest text-center mb-2">Cadastro Rápido</p>
+                        <input 
+                          type="text" 
+                          id="new-client-name"
+                          defaultValue={searchCpf}
+                          placeholder="Nome Completo"
+                          className="w-full bg-white/5 border border-white/10 rounded-lg p-2.5 text-sm text-white focus:border-primary/50 focus:outline-none"
+                        />
+                        <input 
+                          type="text" 
+                          id="new-client-phone"
+                          placeholder="WhatsApp (ex: 62 99999-9999)"
+                          className="w-full bg-white/5 border border-white/10 rounded-lg p-2.5 text-sm text-white focus:border-primary/50 focus:outline-none"
+                        />
+                        <button 
+                          onClick={async () => {
+                            const nameInput = (document.getElementById('new-client-name') as HTMLInputElement).value;
+                            const phoneInput = (document.getElementById('new-client-phone') as HTMLInputElement).value;
+                            
+                            if (!nameInput || !phoneInput) {
+                              toast.error('Preencha o Nome e o WhatsApp para continuar.');
+                              return;
+                            }
+
+                            setLoading(true);
+                            try {
+                              const newClient = await storage.saveClient({
+                                nome_completo: nameInput,
+                                cpf: '',
+                                whatsapp: phoneInput,
+                                canal_origem: 'agenda'
+                              });
+                              storage.getClients().then(setClients);
+                              setSelectedClient(newClient);
+                              toast.success('Cliente cadastrado rapidamente!');
+                            } catch (e) {
+                              toast.error('Erro ao cadastrar cliente.');
+                            } finally {
+                              setLoading(false);
+                            }
+                          }}
+                          className="w-full bg-primary/10 text-primary border border-primary/20 px-4 py-2.5 rounded-lg text-sm font-bold hover:bg-primary/20 transition-all flex items-center justify-center gap-2"
+                        >
+                          <Plus size={16} /> Salvar e Selecionar
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
