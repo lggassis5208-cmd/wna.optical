@@ -39,6 +39,7 @@ import { notificationService } from './lib/notificationService';
 import type { AppNotification } from './lib/notificationService';
 import { openWhatsApp } from './lib/whatsappUtils';
 import { toast } from 'sonner';
+import {
   MessageCircle,
   CheckCircle,
   Gift,
