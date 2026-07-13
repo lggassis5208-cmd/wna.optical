@@ -192,6 +192,7 @@ export default function SegmentosPage() {
           </table>
         </div>
       </div>
+      </div>
     </ErrorBoundary>
   );
 }
