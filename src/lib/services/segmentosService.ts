@@ -162,7 +162,7 @@ export const segmentosService = {
       const { data, error } = await supabase
         .from('segmentos')
         .select('*')
-        .order('criado_em', { ascending: false });
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
       return data as Segmento[];

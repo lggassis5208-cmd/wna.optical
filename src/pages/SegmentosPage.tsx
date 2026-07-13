@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { segmentosService, type Segmento } from '../lib/services/segmentosService';
 import SegmentBuilderModal from '../components/SegmentBuilderModal';
 import { formatDate } from '../lib/dateUtils';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 
 export default function SegmentosPage() {
   const [segmentos, setSegmentos] = useState<Segmento[]>([]);
@@ -63,8 +64,9 @@ export default function SegmentosPage() {
   );
 
   return (
-    <div className="p-6 md:p-8 space-y-8 animate-in fade-in duration-500">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <ErrorBoundary fallbackMessage="Erro ao renderizar a página de Segmentos.">
+      <div className="p-6 md:p-8 space-y-8 animate-in fade-in duration-500">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-black text-white tracking-tight flex items-center gap-3">
             <Filter className="text-primary" size={32} />
@@ -190,7 +192,7 @@ export default function SegmentosPage() {
           </table>
         </div>
       </div>
-    </div>
+    </ErrorBoundary>
   );
 }
 

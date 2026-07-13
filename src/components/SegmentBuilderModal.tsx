@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { X, Plus, Trash2, Filter, Loader2, AlertTriangle, CheckCircle, ShieldAlert } from 'lucide-react';
+import { X, Plus, Trash2, Filter, Loader2, AlertTriangle, CheckCircle, ShieldAlert, Users, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { 
   segmentosService, 

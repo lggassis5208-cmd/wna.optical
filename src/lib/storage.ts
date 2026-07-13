@@ -59,7 +59,7 @@ export const storage = {
   async getClients() {
     if (isSupabaseConfigured()) {
       try {
-        const { data, error } = await supabase.from('clientes').select('*').order('criado_em', { ascending: false });
+        const { data, error } = await supabase.from('clientes').select('*').order('created_at', { ascending: false });
         if (!error && data) {
           // Mapear nome_completo -> name para compatibilidade com componentes existentes
           return data.map((c: any) => ({ ...c, name: c.nome_completo }));
@@ -133,7 +133,7 @@ export const storage = {
         const { data, error } = await supabase.from('agendamentos').select(`
           *,
           clientes (id, nome_completo, cpf, whatsapp)
-        `).order('data', { ascending: true });
+        `).order('data_agendamento', { ascending: true });
         if (!error && data) {
           return data.map((ag: any) => ({
             ...ag,
@@ -205,7 +205,7 @@ export const storage = {
   async getSales() {
     if (isSupabaseConfigured()) {
       try {
-        const { data, error } = await supabase.from('vendas').select('*').order('criado_em', { ascending: false });
+        const { data, error } = await supabase.from('vendas').select('*').order('created_at', { ascending: false });
         if (!error) return data;
         console.warn('Supabase select error', error);
       } catch (e) {
@@ -240,7 +240,7 @@ export const storage = {
   async getExames() {
     if (isSupabaseConfigured()) {
       try {
-        const { data, error } = await supabase.from('exames').select('*').order('data', { ascending: true });
+        const { data, error } = await supabase.from('exames').select('*').order('created_at', { ascending: true });
         if (!error) return data;
       } catch (e) {
         console.warn('Supabase error, using LocalStorage', e);

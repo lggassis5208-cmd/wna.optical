@@ -26,7 +26,7 @@ export const campanhasService = {
           *,
           segmentos (nome)
         `)
-        .order('criado_em', { ascending: false });
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
       

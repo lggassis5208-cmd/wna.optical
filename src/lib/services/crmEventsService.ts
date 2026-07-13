@@ -15,7 +15,7 @@ export const crmEventsService = {
         .from('eventos_relacionamento')
         .select('*')
         .eq('cliente_id', clientId)
-        .order('criado_em', { ascending: false });
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
       return data || [];
