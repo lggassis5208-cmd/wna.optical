@@ -39,11 +39,11 @@ import { notificationService } from './lib/notificationService';
 import type { AppNotification } from './lib/notificationService';
 import { openWhatsApp } from './lib/whatsappUtils';
 import { toast } from 'sonner';
-import { 
   MessageCircle,
   CheckCircle,
   Gift,
-  Filter
+  Filter,
+  Send
 } from 'lucide-react';
 
 function NotificationBell() {
@@ -181,22 +181,24 @@ function Layout() {
             active={location.pathname === '/clientes'} 
           />
           <NavItem 
-            to="/segmentos" 
-            icon={<Filter size={20} />} 
-            label="Segmentos (Motor)" 
-            active={location.pathname === '/segmentos'} 
-          />
-          <NavItem 
-            to="/campanhas" 
-            icon={<MessageCircle size={20} />} 
-            label="Campanhas WhatsApp" 
-            active={location.pathname === '/campanhas'} 
-          />
-          <NavItem 
             to="/crm" 
             icon={<MessageCircle size={20} />} 
             label="CRM Pós-Venda" 
             active={location.pathname === '/crm'} 
+          />
+          <NavItem 
+            to="/segmentos" 
+            icon={<Filter size={16} />} 
+            label="Segmentos" 
+            active={location.pathname === '/segmentos'} 
+            isSubItem
+          />
+          <NavItem 
+            to="/campanhas" 
+            icon={<Send size={16} />} 
+            label="Campanhas" 
+            active={location.pathname === '/campanhas'} 
+            isSubItem
           />
           <NavItem 
             to="/agenda" 
@@ -289,18 +291,19 @@ function Layout() {
   );
 }
 
-function NavItem({ to, icon, label, active = false }: { to: string, icon: React.ReactNode, label: string, active?: boolean }) {
+function NavItem({ to, icon, label, active = false, isSubItem = false }: { to: string, icon: React.ReactNode, label: string, active?: boolean, isSubItem?: boolean }) {
   return (
     <Link 
       to={to} 
       className={`
-        flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group
+        flex items-center gap-3 rounded-xl transition-all duration-200 group
+        ${isSubItem ? 'ml-6 px-4 py-2 text-sm' : 'px-4 py-3'}
         ${active 
-          ? 'bg-primary text-black font-semibold shadow-lg shadow-primary/20' 
+          ? (isSubItem ? 'bg-primary/10 text-primary font-bold' : 'bg-primary text-black font-semibold shadow-lg shadow-primary/20')
           : 'text-white/60 hover:text-white hover:bg-white/5'}
       `}
     >
-      <span className={active ? 'text-black' : 'group-hover:text-primary transition-colors'}>
+      <span className={active ? (isSubItem ? 'text-primary' : 'text-black') : 'group-hover:text-primary transition-colors'}>
         {icon}
       </span>
       <span>{label}</span>
