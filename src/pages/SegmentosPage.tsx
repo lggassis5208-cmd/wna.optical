@@ -146,9 +146,10 @@ export default function SegmentosPage() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex flex-wrap gap-2">
-                      <span className="bg-white/10 text-white/70 text-[10px] uppercase font-bold px-2 py-1 rounded-md">
-                        {seg.regras.length} Regras (E)
-                      </span>
+                      <div className="flex items-center gap-1 bg-white/10 text-white/70 text-[10px] uppercase font-bold px-2 py-1 rounded-md">
+                        <Filter size={14} />
+                        {seg.regras.rules?.length || 0} Regras ({seg.regras.condition === 'AND' ? 'E' : 'OU'})
+                      </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 text-center">
