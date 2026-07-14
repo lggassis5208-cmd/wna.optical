@@ -25,6 +25,7 @@ import CrmPage from './pages/CrmPage';
 import SalesPage from './pages/SalesPage';
 import AgendaPage from './pages/AgendaPage';
 import CaixaPage from './pages/CaixaPage';
+import LeadsPage from './pages/LeadsPage';
 import FinanceiroPage from './pages/FinanceiroPage';
 import InventoryPage from './pages/InventoryPage';
 import FiscalPage from './pages/FiscalPage';
@@ -214,6 +215,12 @@ function Layout() {
             active={location.pathname === '/caixa'} 
           />
           <NavItem 
+            to="/leads" 
+            icon={<Users size={20} />} 
+            label="Pipeline de Leads" 
+            active={location.pathname === '/leads'} 
+          />
+          <NavItem 
             to="/financeiro" 
             icon={<TrendingUp size={20} />} 
             label="Financeiro" 
@@ -334,6 +341,7 @@ function App() {
           <Route path="vendas" element={<SalesPage />} />
           <Route path="agenda" element={<AgendaPage />} />
           <Route path="caixa" element={<CaixaPage />} />
+          <Route path="leads" element={<LeadsPage />} />
           <Route path="financeiro" element={<FinanceiroPage />} />
           <Route path="estoque" element={<InventoryPage />} />
           <Route path="fiscal" element={<FiscalPage />} />
