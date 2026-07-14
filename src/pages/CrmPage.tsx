@@ -10,6 +10,7 @@ export default function CrmPage() {
   const [aniversariantes, setAniversariantes] = useState<CrmCliente[]>([]);
   const [posVenda, setPosVenda] = useState<CrmVenda[]>([]);
   const [renovacao, setRenovacao] = useState<CrmVenda[]>([]);
+  const [filaRobo, setFilaRobo] = useState<any[]>([]);
 
   useEffect(() => {
     carregarCRM();
@@ -18,14 +19,16 @@ export default function CrmPage() {
   const carregarCRM = async () => {
     setLoading(true);
     try {
-      const [anivers, pv, ren] = await Promise.all([
+      const [anivers, pv, ren, fila] = await Promise.all([
         crmService.buscarAniversariantesMes(),
         crmService.buscarPosVendaRecente(7), // 7 dias
-        crmService.buscarReceitasVencendo(11) // 11 meses
+        crmService.buscarReceitasVencendo(11), // 11 meses
+        crmService.buscarEnviosPosVenda()
       ]);
       setAniversariantes(anivers);
       setPosVenda(pv);
       setRenovacao(ren);
+      setFilaRobo(fila || []);
     } catch (e: any) {
       toast.error('Erro ao carregar dados do CRM');
     }
@@ -178,6 +181,52 @@ export default function CrmPage() {
                     <MessageCircle size={16} />
                     Sugerir Consulta
                   </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Coluna 4: Fila do Robô WAHA */}
+          <div className="w-[380px] flex flex-col bg-surface/50 border border-white/5 rounded-3xl overflow-hidden">
+            <div className="p-5 border-b border-white/5 flex items-center gap-3 bg-gradient-to-r from-green-500/10 to-transparent">
+              <div className="p-3 bg-green-500/20 text-green-400 rounded-xl">
+                <AlertCircle size={24} />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white">Robô WAHA (Automático)</h3>
+                <p className="text-xs text-white/40">Próximos disparos agendados</p>
+              </div>
+              <div className="ml-auto bg-green-500/20 text-green-400 px-3 py-1 text-sm font-bold rounded-full">
+                {filaRobo.length}
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {filaRobo.length === 0 && (
+                <p className="text-center text-white/30 text-sm mt-4 italic">Fila de envio vazia.</p>
+              )}
+              {filaRobo.map(envio => (
+                <div key={envio.id} className="bg-white/5 border border-white/10 p-4 rounded-2xl hover:border-green-500/30 transition-all group">
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="font-mono text-xs font-bold text-green-500 bg-green-500/10 px-2 py-0.5 rounded-md">
+                      D+{envio.marco_dia}
+                    </span>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase
+                      ${envio.status === 'enviado' ? 'bg-green-500/10 text-green-500' :
+                        envio.status === 'pendente' ? 'bg-yellow-500/10 text-yellow-500' :
+                        'bg-red-500/10 text-red-500'}
+                    `}>
+                      {envio.status}
+                    </span>
+                  </div>
+                  <h4 className="font-bold text-white mb-1">{envio.clientes?.nome || 'Desconhecido'}</h4>
+                  <p className="text-xs text-white/50 mb-2">
+                    Agendado: {format(new Date(envio.agendado_para), 'dd/MM/yyyy HH:mm')}
+                  </p>
+                  {envio.erro_log && (
+                    <p className="text-[10px] text-red-400 bg-red-400/10 p-2 rounded-lg mt-2">
+                      Erro: {envio.erro_log}
+                    </p>
+                  )}
                 </div>
               ))}
             </div>

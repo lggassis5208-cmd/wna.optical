@@ -34,7 +34,8 @@ export default function ClientModal({ isOpen, onClose }: ClientModalProps) {
     uf: '',
     numero: '',
     data_nascimento: '',
-    canal_origem: 'loja_fisica',
+    canal_origem: 'whatsapp',
+    temperatura: 'frio',
     consentimento_marketing: true
   });
 
@@ -194,11 +195,29 @@ export default function ClientModal({ isOpen, onClose }: ClientModalProps) {
                       value={formData.canal_origem}
                       onChange={(e) => setFormData({...formData, canal_origem: e.target.value})}
                     >
-                      <option value="loja_fisica" className="bg-black">Loja Física</option>
-                      <option value="google_ads" className="bg-black">Google Ads</option>
-                      <option value="meta_ads" className="bg-black">Instagram/Facebook Ads</option>
+                      <option value="whatsapp" className="bg-black">WhatsApp</option>
+                      <option value="anuncio" className="bg-black">Anúncio / Instagram</option>
                       <option value="indicacao" className="bg-black">Indicação</option>
-                      <option value="outro" className="bg-black">Outro</option>
+                      <option value="passagem" className="bg-black">Passagem na Loja</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-white/40 ml-1">Temperatura</label>
+                  <div className="relative">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20">
+                      <Megaphone size={16} />
+                    </div>
+                    <select 
+                      className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:border-primary/50 transition-colors text-white appearance-none"
+                      value={formData.temperatura}
+                      onChange={(e) => setFormData({...formData, temperatura: e.target.value})}
+                    >
+                      <option value="frio" className="bg-black">Frio</option>
+                      <option value="morno" className="bg-black">Morno</option>
+                      <option value="quente" className="bg-black">Quente</option>
+                      <option value="fidelizado" className="bg-black">Fidelizado</option>
                     </select>
                   </div>
                 </div>

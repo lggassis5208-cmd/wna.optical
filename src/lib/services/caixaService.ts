@@ -29,7 +29,37 @@ export const caixaService = {
       throw error;
     }
 
-    return data as Caixa | null;
+    const caixa = data as Caixa | null;
+    if (caixa) {
+      const horasAberto = differenceInHours(new Date(), new Date(caixa.data_abertura));
+      if (horasAberto >= 24) {
+        try {
+          const { data: movs } = await supabase
+            .from('movimentos_caixa')
+            .select('valor, tipo')
+            .eq('caixa_id', caixa.id);
+
+          let totalEntradas = 0;
+          let totalSaidas = 0;
+          if (movs) {
+            totalEntradas = movs
+              .filter(m => m.tipo === 'ENTRADA' || m.tipo === 'SUPRIMENTO')
+              .reduce((sum, m) => sum + Number(m.valor), 0);
+            totalSaidas = movs
+              .filter(m => m.tipo === 'SAIDA' || m.tipo === 'DESPESA' || m.tipo === 'SANGRIA')
+              .reduce((sum, m) => sum + Number(m.valor), 0);
+          }
+          const saldoEsperado = (caixa.valor_inicial || 0) + totalEntradas - totalSaidas;
+          
+          await this.fecharCaixa(caixa.id, saldoEsperado, saldoEsperado, caixa.usuario_abertura_id);
+        } catch (e) {
+          console.error('Erro ao fechar caixa antigo automaticamente:', e);
+        }
+        return null; // Caixa anterior foi fechado
+      }
+    }
+
+    return caixa;
   },
 
   async abrirCaixa(valorInicial: number, usuarioId: string): Promise<Caixa> {
@@ -107,5 +137,13 @@ export const caixaService = {
     }
 
     return data as Caixa[];
+  },
+
+  async garantirCaixaAtivo(usuarioId: string): Promise<Caixa> {
+    const caixaAtivo = await this.buscarCaixaAtivo();
+    if (caixaAtivo) {
+      return caixaAtivo;
+    }
+    return await this.abrirCaixa(0.01, usuarioId);
   }
 };

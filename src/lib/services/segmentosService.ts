@@ -78,6 +78,18 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
     { value: 'inativo', label: 'Inativo' },
     { value: 'lead', label: 'Lead' }
   ]},
+  { value: 'temperatura', label: 'Temperatura (Lead)', type: 'enum', options: [
+    { value: 'frio', label: 'Frio' },
+    { value: 'morno', label: 'Morno' },
+    { value: 'quente', label: 'Quente' },
+    { value: 'fidelizado', label: 'Fidelizado' }
+  ]},
+  { value: 'canal_origem', label: 'Origem do Cliente', type: 'enum', options: [
+    { value: 'whatsapp', label: 'WhatsApp' },
+    { value: 'anuncio', label: 'Anúncio / Instagram' },
+    { value: 'indicacao', label: 'Indicação' },
+    { value: 'passagem', label: 'Passagem na Loja' }
+  ]},
 ];
 
 export const OPERATORS_BY_TYPE: Record<FieldType, { value: Operator; label: string }[]> = {

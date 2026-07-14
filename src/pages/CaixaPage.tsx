@@ -28,11 +28,9 @@ export default function CaixaPage() {
   const [caixaAtivo, setCaixaAtivo] = useState<Caixa | null>(null);
   const [movimentos, setMovimentos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [abrirModal, setAbrirModal] = useState(false);
   const [saidaModal, setSaidaModal] = useState(false);
   const [entradaModal, setEntradaModal] = useState(false);
   const [historicoModal, setHistoricoModal] = useState(false);
-  const [valorAbertura, setValorAbertura] = useState('0.01');
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [novaSaida, setNovaSaida] = useState({ descricao: '', valor: '', forma: 'Dinheiro', categoria_id: '' });
   const [novaEntrada, setNovaEntrada] = useState({ descricao: '', valor: '', forma: 'Dinheiro', categoria_id: '' });
@@ -79,13 +77,11 @@ export default function CaixaPage() {
 
   const handleAbrirCaixa = async () => {
     try {
-      if (!valorAbertura) return toast.error('Informe o valor de abertura');
-      await caixaService.abrirCaixa(Number(valorAbertura), mockUsuarioId);
-      toast.success('Caixa aberto com sucesso!');
-      setAbrirModal(false);
+      await caixaService.abrirCaixa(0.01, mockUsuarioId);
+      toast.success('Caixa aberto com sucesso com R$ 0,01!');
       carregarCaixa();
     } catch (e: any) {
-      toast.error(e.message);
+      toast.error(e.message || 'Erro ao abrir o caixa.');
     }
   };
 
@@ -217,7 +213,7 @@ export default function CaixaPage() {
         </div>
         {!caixaAtivo ? (
           <button
-            onClick={() => setAbrirModal(true)}
+            onClick={handleAbrirCaixa}
             className="bg-primary text-black font-black px-8 py-3 rounded-2xl flex items-center gap-3 hover:shadow-xl hover:shadow-primary/20 transition-all active:scale-95"
           >
             <Unlock size={20} />
@@ -464,43 +460,7 @@ export default function CaixaPage() {
         </div>
       )}
 
-      {/* Modal Abertura */}
-      {abrirModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="bg-surface w-full max-w-md rounded-3xl border border-white/10 shadow-2xl overflow-hidden animate-in zoom-in-95">
-            <div className="p-6 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
-              <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                <Unlock size={20} className="text-primary" />
-                Abertura de Caixa
-              </h3>
-              <button onClick={() => setAbrirModal(false)} className="p-2 hover:bg-white/5 rounded-full text-white/40">
-                <X size={24} />
-              </button>
-            </div>
-            <div className="p-8 space-y-4">
-              <label className="text-xs font-black text-white/20 uppercase tracking-widest ml-1">Saldo Inicial em Dinheiro</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0.01"
-                placeholder="R$ 0,00"
-                className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-2xl font-black text-white focus:outline-none focus:border-primary/50 transition-colors"
-                value={valorAbertura}
-                onChange={(e) => setValorAbertura(e.target.value)}
-              />
-              <p className="text-xs text-white/30 italic">Lembre-se de conferir os valores físicos na gaveta.</p>
-            </div>
-            <div className="p-6 border-t border-white/5 bg-white/[0.02]">
-              <button
-                onClick={handleAbrirCaixa}
-                className="w-full bg-primary text-black font-black py-4 rounded-2xl shadow-lg shadow-primary/20 hover:scale-[1.02] transition-all active:scale-95"
-              >
-                Confirmar e Abrir Caixa
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Modal Abertura removido pois o caixa abre diretamente com R$ 0,01 */}
 
       {/* Modal Saída / Sangria */}
       {saidaModal && (

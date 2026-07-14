@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { caixaService } from './caixaService';
 
 export interface PagamentoVenda {
   id?: string;
@@ -27,27 +28,27 @@ export interface VendaInput {
   metadata?: any;
   itens: ItemVenda[];
   pagamentos: PagamentoVenda[];
+  criado_em?: string;
 }
 
 export const vendasService = {
   async salvarVenda(vendaInput: VendaInput) {
-    // Iniciar a transação através de uma function RPC seria ideal, mas como não temos uma garantida,
-    // faremos as inserções sequenciais ou adaptaremos dependendo da API.
-    // Para simplificar, faremos inserções múltiplas:
+    const caixa = await caixaService.garantirCaixaAtivo(vendaInput.usuario_id);
     
     // 1. Inserir a Venda
     const { data: vendaData, error: vendaError } = await supabase
       .from('vendas')
       .insert([{
         os_number: vendaInput.os_number,
-        caixa_id: vendaInput.caixa_id,
+        caixa_id: caixa.id,
         cliente_id: vendaInput.cliente_id,
         usuario_id: vendaInput.usuario_id,
         valor_bruto: vendaInput.valor_bruto,
         desconto: vendaInput.desconto,
         valor_liquido: vendaInput.valor_liquido,
         metadata: vendaInput.metadata,
-        status: 'CONCLUIDA'
+        status: 'CONCLUIDA',
+        ...(vendaInput.criado_em ? { criado_em: vendaInput.criado_em } : {})
       }])
       .select()
       .single();
@@ -98,7 +99,7 @@ export const vendasService = {
     // Registrar no fluxo de caixa
     for (const pagamento of vendaInput.pagamentos) {
       await supabase.from('movimentos_caixa').insert([{
-        caixa_id: vendaInput.caixa_id,
+        caixa_id: caixa.id,
         tipo: 'ENTRADA',
         descricao: `Venda OS: ${vendaInput.os_number || 'S/N'}`,
         valor: pagamento.valor,
@@ -142,5 +143,42 @@ export const vendasService = {
     }
 
     return data;
+  },
+
+  async atualizarStatusOS(vendaId: string, deStatus: string, paraStatus: string, usuarioId: string) {
+    try {
+      // 1. Prepara o update da OS
+      let updatePayload: any = { status: paraStatus };
+      if (paraStatus === 'ENVIADA_LAB') updatePayload.enviada_lab_em = new Date().toISOString();
+      if (paraStatus === 'PRONTA') updatePayload.pronta_em = new Date().toISOString();
+      if (paraStatus === 'ENTREGUE') updatePayload.entregue_em = new Date().toISOString();
+
+      // 2. Atualiza Venda
+      const { error: updateError } = await supabase
+        .from('vendas')
+        .update(updatePayload)
+        .eq('id', vendaId);
+
+      if (updateError) throw updateError;
+
+      // 3. Registra Auditoria (os_eventos)
+      const { error: eventoError } = await supabase
+        .from('os_eventos')
+        .insert([{
+          venda_id: vendaId,
+          de_status: deStatus,
+          para_status: paraStatus,
+          por_usuario: usuarioId
+        }]);
+
+      if (eventoError) {
+        console.warn('Falha ao registrar log de evento da OS:', eventoError);
+      }
+
+      return true;
+    } catch (e) {
+      console.error('Erro ao atualizar status da OS:', e);
+      throw e;
+    }
   }
 };

@@ -190,6 +190,7 @@ export default function ClientsPage() {
               <tr className="bg-black/20 text-white/40 text-xs uppercase tracking-widest font-semibold">
                 <th className="px-6 py-4">Cliente</th>
                 <th className="px-6 py-4">Contato</th>
+                <th className="px-6 py-4 text-center">Temperatura</th>
                 <th className="px-6 py-4 text-center">Lis Score</th>
                 <th className="px-6 py-4">Cadastro</th>
                 <th className="px-6 py-4 text-right">Ações</th>
@@ -229,6 +230,25 @@ export default function ClientsPage() {
                         {client.whatsapp}
                       </div>
                     </div>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    {client.temperatura === 'quente' ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-bold">
+                        🔥 Quente
+                      </span>
+                    ) : client.temperatura === 'morno' ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 text-xs font-bold">
+                        ☀️ Morno
+                      </span>
+                    ) : client.temperatura === 'fidelizado' ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs font-bold">
+                        💎 Fidelizado
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-bold">
+                        ❄️ Frio
+                      </span>
+                    )}
                   </td>
                   <td className="px-6 py-4 text-center">
                     <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-bold">

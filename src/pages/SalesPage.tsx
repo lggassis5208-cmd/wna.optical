@@ -13,12 +13,15 @@ import {
   MessageSquare,
   Send,
   Download,
-  ExternalLink
+  ExternalLink,
+  LayoutGrid,
+  List
 } from 'lucide-react';
 import { toast } from 'sonner';
 import SaleModal from '../components/SaleModal';
 import PrintOS from '../components/PrintOS';
 import NotaAvulsaModal from '../components/NotaAvulsaModal';
+import OsKanbanBoard from '../components/OsKanbanBoard';
 import { storage } from '../lib/storage';
 import { formatDate } from '../lib/dateUtils';
 import { openWhatsApp } from '../lib/whatsappUtils';
@@ -29,6 +32,7 @@ export default function SalesPage() {
   const [isAvulsaOpen, setIsAvulsaOpen] = useState(false);
   const [sales, setSales] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('kanban');
   const [settings, setSettings] = useState<any>(null);
   const [activeSale, setActiveSale] = useState<any>(null);
 
@@ -139,8 +143,28 @@ export default function SalesPage() {
             <Filter size={18} />
             Filtros
           </button>
+          
+          <div className="flex bg-black/40 rounded-lg p-1 border border-white/10">
+            <button 
+              onClick={() => setViewMode('list')}
+              className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-white/20 text-white' : 'text-white/40 hover:text-white'}`}
+            >
+              <List size={18} />
+            </button>
+            <button 
+              onClick={() => setViewMode('kanban')}
+              className={`p-1.5 rounded-md transition-all ${viewMode === 'kanban' ? 'bg-white/20 text-white' : 'text-white/40 hover:text-white'}`}
+            >
+              <LayoutGrid size={18} />
+            </button>
+          </div>
         </div>
 
+        {viewMode === 'kanban' ? (
+          <div className="p-6">
+            <OsKanbanBoard sales={filteredSales} onUpdate={fetchSales} />
+          </div>
+        ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
@@ -337,6 +361,7 @@ export default function SalesPage() {
             </tbody>
           </table>
         </div>
+        )}
       </div>
     </div>
   );

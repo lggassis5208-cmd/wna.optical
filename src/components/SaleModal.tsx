@@ -189,10 +189,31 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
     is_birthday_discount: false,
     valor_base: '0.00',
     desconto: '0.00',
-    valor_total: '0.00'
+    valor_total: '0.00',
+    criado_em: getNowISO().split('T')[0]
   };
 
-  const [formData, setFormData] = useState(initialState);
+  const [formData, setFormData] = useState<{
+    cliente_id: string;
+    tecnico: string;
+    od_esferico: string;
+    od_cilindrico: string;
+    od_eixo: string;
+    od_dnp: string;
+    od_adicao: string;
+    oe_esferico: string;
+    oe_cilindrico: string;
+    oe_eixo: string;
+    oe_dnp: string;
+    oe_adicao: string;
+    tipo_lente: string;
+    tratamento: string;
+    is_birthday_discount: boolean;
+    valor_base: string;
+    desconto: string;
+    valor_total: string;
+    criado_em?: string;
+  }>(initialState);
   
   const [pagamentos, setPagamentos] = useState<{forma_pagamento: string, valor: number}[]>([{ forma_pagamento: 'Cartão de Crédito', valor: 0 }]);
 
@@ -407,7 +428,7 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
         oe_dnp: parseFloat(formData.oe_dnp) || 0,
         oe_adicao: parseFloat(formData.oe_adicao) || 0,
         valor_total: parseFloat(formData.valor_total) || 0,
-        criado_em: getNowISO()
+        criado_em: formData.criado_em ? new Date(`${formData.criado_em}T12:00:00Z`).toISOString() : getNowISO()
       };
       
       const valorTotalRecebido = pagamentos.reduce((acc, p) => acc + Number(p.valor), 0);
@@ -425,6 +446,7 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
         valor_bruto: parseFloat(formData.valor_base) || 0,
         desconto: parseFloat(formData.desconto) || 0,
         valor_liquido: saleToSave.valor_total,
+        criado_em: saleToSave.criado_em,
         metadata: {
           paciente_nome: clienteNome,
           paciente_cpf: clienteCpf,
@@ -559,8 +581,20 @@ export default function SaleModal({ isOpen, onClose }: SaleModalProps) {
               {step === 1 && (
             <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
               {/* === BUSCA INTELIGENTE DE CLIENTES === */}
+              {/* === IDENTIFICAÇÃO E DADOS GERAIS === */}
               <section className="space-y-4">
-                <h4 className="text-xs font-bold text-white/20 uppercase tracking-widest border-b border-white/5 pb-2">Identificação do Cliente</h4>
+                <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                  <h4 className="text-xs font-bold text-white/20 uppercase tracking-widest">Identificação do Cliente</h4>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-white/40 font-bold uppercase tracking-widest">Data da Venda:</label>
+                    <input 
+                      type="date" 
+                      value={formData.criado_em || getNowISO().split('T')[0]}
+                      onChange={e => setFormData(prev => ({ ...prev, criado_em: e.target.value }))}
+                      className="bg-black/40 border border-white/10 rounded-md px-2 py-1 text-xs text-white focus:border-primary/50 focus:outline-none"
+                    />
+                  </div>
+                </div>
                 
                 {formData.cliente_id && clienteNome ? (
                   // Card do cliente selecionado

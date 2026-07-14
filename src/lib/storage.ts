@@ -20,19 +20,28 @@ export const getEffectiveAddress = (dateStr?: string) => {
 };
 
 export const storage = {
-  // --- CLIENTES ---
   async saveClient(client: any) {
     if (isSupabaseConfigured()) {
       try {
         // Mapear campos do frontend para o schema do banco
         const row = {
-          nome_completo: client.nome_completo || client.name || '',
+          nome: client.nome_completo || client.name || client.nome || '',
           cpf: client.cpf || '',
           whatsapp: (client.whatsapp || '').replace(/\D/g, ''),
           data_nascimento: client.data_nascimento || null,
           lis_score: client.lis_score || 850,
-          canal_origem: client.canal_origem || 'loja_fisica',
-          consentimento_marketing: client.consentimento_marketing !== false
+          canal_origem: client.canal_origem || client.canal || 'loja_fisica',
+          consentimento_marketing: client.consentimento_marketing !== false,
+          consentimento_saude: Boolean(client.consentimento_saude),
+          temperatura: client.temperatura || 'frio',
+          cep: client.cep || '00000000',
+          logradouro: client.logradouro || null,
+          numero: client.numero || null,
+          bairro: client.bairro || null,
+          cidade: client.cidade || null,
+          estado: client.estado || null,
+          email: client.email || null,
+          rg: client.rg || null
         };
         const { data, error } = await supabase.from('clientes').insert([row]).select();
         if (!error && data) return data[0];
@@ -59,10 +68,10 @@ export const storage = {
   async getClients() {
     if (isSupabaseConfigured()) {
       try {
-        const { data, error } = await supabase.from('clientes').select('*').order('created_at', { ascending: false });
+        const { data, error } = await supabase.from('clientes').select('*').order('criado_em', { ascending: false });
         if (!error && data) {
-          // Mapear nome_completo -> name para compatibilidade com componentes existentes
-          return data.map((c: any) => ({ ...c, name: c.nome_completo }));
+          // Mapear nome -> name para compatibilidade com componentes existentes
+          return data.map((c: any) => ({ ...c, name: c.nome || c.nome_completo }));
         }
         console.warn('Supabase select error', error);
       } catch (e) {
@@ -76,7 +85,7 @@ export const storage = {
     if (isSupabaseConfigured()) {
       try {
         const { data, error } = await supabase.from('clientes').select('*').eq('id', id).single();
-        if (!error && data) return { ...data, name: data.nome_completo };
+        if (!error && data) return { ...data, name: data.nome || data.nome_completo };
       } catch (e) {
         console.warn('Supabase getClientById error', e);
       }

@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { caixaService } from './caixaService';
 
 export interface MovimentoCaixaInput {
   caixa_id: string;
@@ -12,9 +13,15 @@ export interface MovimentoCaixaInput {
 
 export const movimentosService = {
   async registrarMovimento(movimento: MovimentoCaixaInput) {
+    const caixa = await caixaService.garantirCaixaAtivo(movimento.usuario_id);
+    const movimentoComCaixa = {
+      ...movimento,
+      caixa_id: caixa.id
+    };
+
     const { data, error } = await supabase
       .from('movimentos_caixa')
-      .insert([movimento])
+      .insert([movimentoComCaixa])
       .select()
       .single();
 

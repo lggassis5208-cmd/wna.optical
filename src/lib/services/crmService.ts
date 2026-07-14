@@ -91,5 +91,31 @@ export const crmService = {
     }
 
     return (data as any[]).filter(v => v.cliente) as CrmVenda[];
+  },
+
+  /**
+   * Puxa a fila atual do novo Motor de Pós-Venda Automático.
+   */
+  async buscarEnviosPosVenda() {
+    const { data, error } = await supabase
+      .from('pos_venda_envios')
+      .select(`
+        id,
+        marco_dia,
+        status,
+        agendado_para,
+        enviado_em,
+        erro_log,
+        clientes ( nome, whatsapp )
+      `)
+      .order('agendado_para', { ascending: false })
+      .limit(100);
+
+    if (error) {
+      console.error('Erro ao buscar envios de pós-venda:', error);
+      throw error;
+    }
+
+    return data;
   }
 };
