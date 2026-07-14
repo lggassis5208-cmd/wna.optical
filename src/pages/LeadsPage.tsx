@@ -118,9 +118,29 @@ export default function LeadsPage() {
       setTenantId(activeTenant);
 
       const { data: leadsData, error } = await supabase
-        .from('leads')
-        .select('*')
+        .from('clientes')
+        .select(`
+          id,
+          tenant_id,
+          nome:nome_completo,
+          telefone:whatsapp,
+          email,
+          origem,
+          origem_detalhe,
+          estagio,
+          responsavel_id,
+          valor_estimado,
+          interesse,
+          motivo_perda,
+          opt_in:opt_in_marketing,
+          consentimento_em,
+          criado_em,
+          atualizado_em,
+          ultimo_contato_em,
+          cliente_id
+        `)
         .eq('tenant_id', activeTenant)
+        .eq('tipo', 'lead')
         .order('atualizado_em', { ascending: false });
 
       if (error) throw error;
@@ -188,22 +208,49 @@ export default function LeadsPage() {
         return toast.error('Já existe um lead cadastrado com este telefone nesta loja.');
       }
 
+      // WhatsApp limpo
+      const rawPhone = novoLead.telefone.replace(/\D/g, '').replace(/^55/, '');
+
       const { data: createdLead, error } = await supabase
-        .from('leads')
+        .from('clientes')
         .insert([{
           tenant_id: tenantId,
-          nome: novoLead.nome,
-          telefone: formattedTelefone,
+          nome_completo: novoLead.nome,
+          whatsapp: rawPhone,
           email: novoLead.email || null,
           origem: novoLead.origem,
           origem_detalhe: novoLead.origem_detalhe || null,
           valor_estimado: novoLead.valor_estimado ? parseFloat(novoLead.valor_estimado) : null,
           interesse: novoLead.interesse || null,
           estagio: 'novo',
-          opt_in: true,
+          tipo: 'lead',
+          status_crm: 'ativo',
+          opt_in_marketing: false, // inicia sem marketing por padrão
+          base_legal: 'legitimo_interesse',
+          canal_consentimento: 'cadastro_loja',
+          termo_versao: 'termo_v1.2',
           consentimento_em: new Date().toISOString()
         }])
-        .select()
+        .select(`
+          id,
+          tenant_id,
+          nome:nome_completo,
+          telefone:whatsapp,
+          email,
+          origem,
+          origem_detalhe,
+          estagio,
+          responsavel_id,
+          valor_estimado,
+          interesse,
+          motivo_perda,
+          opt_in:opt_in_marketing,
+          consentimento_em,
+          criado_em,
+          atualizado_em,
+          ultimo_contato_em,
+          cliente_id
+        `)
         .single();
 
       if (error) throw error;
@@ -237,7 +284,7 @@ export default function LeadsPage() {
   const updateLeadEstagio = async (leadId: string, deEstagio: string, paraEstagio: string, extraData: any = {}) => {
     try {
       const { error } = await supabase
-        .from('leads')
+        .from('clientes')
         .update({
           estagio: paraEstagio,
           atualizado_em: new Date().toISOString(),
@@ -320,47 +367,48 @@ export default function LeadsPage() {
 
       if (associarClienteExistente) {
         if (!selectedClienteId) return toast.error('Selecione um cliente existente');
+        
+        // Copia dados do lead para o cliente existente e marca como cliente
+        await supabase.from('clientes').update({
+          tipo: 'cliente',
+          estagio: 'ganho',
+          valor_estimado: lead.valor_estimado,
+          interesse: lead.interesse,
+          atualizado_em: new Date().toISOString(),
+          ultimo_contato_em: new Date().toISOString()
+        }).eq('id', selectedClienteId);
+
+        // Remove o lead duplicado
+        await supabase.from('clientes').delete().eq('id', ganhoLeadId);
         finalClienteId = selectedClienteId;
       } else {
-        // Criar novo cliente
-        const rawPhone = lead.telefone.replace('@c.us', '').replace('55', '');
-        const { data: novoCliente, error: cliErr } = await supabase
-          .from('clientes')
-          .insert([{
-            tenant_id: tenantId,
-            nome_completo: lead.nome,
-            whatsapp: rawPhone,
-            email: lead.email,
-            consentimento_marketing: lead.opt_in,
-            lis_score: 850
-          }])
-          .select()
-          .single();
-
-        if (cliErr || !novoCliente) throw cliErr || new Error('Erro ao criar cliente');
-        finalClienteId = novoCliente.id;
+        // Promove o próprio lead na tabela de clientes
+        await updateLeadEstagio(ganhoLeadId, lead.estagio, 'ganho', {
+          tipo: 'cliente',
+          opt_in_marketing: lead.opt_in,
+          base_legal: lead.opt_in ? 'consentimento' : 'legitimo_interesse',
+          canal_consentimento: 'cadastro_loja',
+          termo_versao: 'termo_v1.2',
+          consentimento_em: new Date().toISOString()
+        });
+        finalClienteId = ganhoLeadId;
       }
-
-      // Atualiza o lead
-      await updateLeadEstagio(ganhoLeadId, lead.estagio, 'ganho', {
-        cliente_id: finalClienteId
-      });
 
       // Disparar início do fluxo de pós-venda (Opcional - agenda mensagem automática do dia 15)
       await supabase.from('pos_venda_envios').insert([{
         tenant_id: tenantId,
         cliente_id: finalClienteId,
-        venda_id: null, // Venda avulsa/conversão lead
-        marco_dia: 15,
+        venda_id: null,
         status: 'pendente',
         agendado_para: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
         tipo_gatilho: 'conversao_lead'
       }]);
 
-      toast.success('Lead convertido em cliente e pós-venda agendado!');
+      toast.success('Lead convertido em cliente com sucesso!');
       setIsGanhoOpen(false);
       setGanhoLeadId(null);
       setSelectedClienteId('');
+      fetchTenantAndLeads();
     } catch (e: any) {
       toast.error('Erro na conversão: ' + e.message);
     }
@@ -380,7 +428,7 @@ export default function LeadsPage() {
 
       if (error) throw error;
       
-      await supabase.from('leads').update({
+      await supabase.from('clientes').update({
         ultimo_contato_em: new Date().toISOString(),
         atualizado_em: new Date().toISOString()
       }).eq('id', selectedLead.id);

@@ -73,6 +73,7 @@ export default function SegmentBuilderModal({ isOpen, onClose, onSuccess }: Segm
   const [finalidade, setFinalidade] = useState('');
   
   const [rootGroup, setRootGroup] = useState<RuleGroup>({ type: 'group', condition: 'AND', rules: [] });
+  const [tipoCampanha, setTipoCampanha] = useState<'marketing' | 'relacionamento'>('marketing');
   const [matchResult, setMatchResult] = useState<EvaluationResult | null>(null);
 
   // States for template selection
@@ -140,7 +141,7 @@ export default function SegmentBuilderModal({ isOpen, onClose, onSuccess }: Segm
     if (rootGroup.rules.length === 0) return;
     setEvaluating(true);
     try {
-      const result = await segmentosService.evaluateSegmentoCount(rootGroup);
+      const result = await segmentosService.evaluateSegmentoCount(rootGroup, tipoCampanha);
       setMatchResult(result);
     } catch (e) {
       toast.error('Erro ao calcular público.');
@@ -169,8 +170,9 @@ export default function SegmentBuilderModal({ isOpen, onClose, onSuccess }: Segm
         nome,
         regras: rootGroup,
         base_legal: baseLegal,
-        finalidade
-      });
+        finalidade,
+        tipo_campanha: tipoCampanha
+      } as any);
       toast.success('Segmento salvo com sucesso!');
       onSuccess();
       onClose();
@@ -445,22 +447,72 @@ export default function SegmentBuilderModal({ isOpen, onClose, onSuccess }: Segm
             {renderNode(rootGroup, [])}
           </div>
 
-          {matchResult && (
-            <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-4 space-y-3">
-              <div className="flex items-center gap-2 text-green-400 font-bold">
-                <CheckCircle size={18} /> Público Alvo Encontrado: {matchResult.count} Clientes
+          {/* Tipo de Campanha & Consentimento LGPD */}
+          <div className="bg-black/20 p-5 rounded-2xl border border-white/5 space-y-4">
+            <h4 className="text-xs font-bold text-white/60 uppercase tracking-widest">Finalidade e Regras de Remarketing (LGPD)</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-[10px] text-white/40 font-bold uppercase">Tipo de Campanha</label>
+                <select
+                  value={tipoCampanha}
+                  onChange={(e) => {
+                    setTipoCampanha(e.target.value as any);
+                    setMatchResult(null);
+                  }}
+                  className="w-full bg-black/60 border border-white/10 rounded-xl p-2.5 text-xs text-white"
+                >
+                  <option value="marketing">Campanha de Marketing / Promoção (Exige Opt-in)</option>
+                  <option value="relacionamento">Relacionamento / Pós-Venda (Legítimo Interesse)</option>
+                </select>
               </div>
-              <p className="text-[10px] text-green-500/60 uppercase">A supressão LGPD (Opt-out) foi aplicada no backend automaticamente.</p>
+              <div className="space-y-1">
+                <label className="text-[10px] text-white/40 font-bold uppercase">Base Legal do Público</label>
+                <div className="bg-white/5 border border-white/10 rounded-xl p-2.5 text-xs text-primary font-black capitalize">
+                  {tipoCampanha === 'marketing' ? 'Consentimento Livre (Opt-in)' : 'Legítimo Interesse Comercial'}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {matchResult && (
+            <div className="bg-green-500/10 border border-green-500/20 rounded-2xl p-6 space-y-4">
+              <div className="flex items-center gap-2 text-green-400 font-bold text-sm">
+                <CheckCircle size={20} /> Preview de Elegibilidade do Público
+              </div>
               
-              {matchResult.sample.length > 0 && (
-                <div className="mt-4">
-                  <p className="text-xs font-bold text-white/40 mb-2">Amostra Mascarada (Top 5)</p>
+              {/* Box de Estatísticas de Transparência */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-black/40 p-4 rounded-xl text-center border border-white/5">
+                <div className="space-y-1">
+                  <p className="text-[10px] text-white/40 uppercase font-black">No Filtro</p>
+                  <p className="text-lg font-black text-white">{matchResult.totalFiltro || 0}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[10px] text-red-400/60 uppercase font-black">Opt-out/Supressão</p>
+                  <p className="text-lg font-black text-red-400">-{matchResult.excluidosSupressao || 0}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[10px] text-yellow-500/60 uppercase font-black">Sem Consentimento</p>
+                  <p className="text-lg font-black text-yellow-500">-{matchResult.excluidosConsentimento || 0}</p>
+                </div>
+                <div className="space-y-1 border-l border-white/10">
+                  <p className="text-[10px] text-primary uppercase font-black">Elegíveis</p>
+                  <p className="text-lg font-black text-primary">{matchResult.count || 0}</p>
+                </div>
+              </div>
+              
+              <p className="text-[10px] text-green-500/60 uppercase font-bold flex items-center gap-1.5">
+                <ShieldAlert size={12} /> A supressão global e os critérios de opt-in foram aplicados no cálculo automaticamente.
+              </p>
+              
+              {matchResult.sample && matchResult.sample.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-white/5">
+                  <p className="text-xs font-bold text-white/40 mb-2">Amostra Mascarada de Contatos (LGPD Minimization)</p>
                   <div className="space-y-2">
                     {matchResult.sample.slice(0, 5).map((s, idx) => (
-                      <div key={idx} className="flex justify-between items-center text-xs bg-black/20 p-2 rounded-lg border border-white/5">
-                        <span className="text-white/60">{s.nome}</span>
+                      <div key={idx} className="flex justify-between items-center text-xs bg-black/20 p-2.5 rounded-lg border border-white/5">
+                        <span className="text-white/80 font-bold">{s.nome}</span>
                         <div className="flex gap-4">
-                          <span className="text-white/40 font-mono">{s.cpf_mascarado}</span>
+                          <span className="text-white/40 font-mono">{s.email_mascarado}</span>
                           <span className="text-white/40 font-mono">{s.whatsapp_mascarado}</span>
                         </div>
                       </div>

@@ -294,6 +294,30 @@ export default function ClientModal({ isOpen, onClose }: ClientModalProps) {
                 />
               </div>
             </div>
+
+            {/* Seção LGPD de Consentimento */}
+            <div className="space-y-4 pt-4 border-t border-white/5">
+              <h4 className="text-xs font-bold text-white/20 uppercase tracking-widest border-b border-white/5 pb-2">Consentimento e LGPD</h4>
+              <div className="bg-black/40 border border-white/10 rounded-2xl p-4 space-y-3">
+                <div className="text-[11px] text-white/50 leading-relaxed max-h-20 overflow-y-auto pr-2 border-b border-white/5 pb-2 font-mono">
+                  <p className="font-bold mb-1 text-white/80">Termo de Consentimento de Comunicação - Versão 1.2</p>
+                  Autorizo o processamento de meus dados pela Ótica Lis para o acompanhamento de ordens de serviço, receitas de exames e relacionamento comercial de pós-venda. Opcionalmente, autorizo o envio de novidades e campanhas promocionais. A revogação do consentimento pode ser realizada a qualquer momento respondendo "PARE" nas comunicações.
+                </div>
+                
+                <div className="flex items-start gap-3 mt-2">
+                  <input 
+                    type="checkbox" 
+                    id="consentimento_marketing_chk"
+                    className="w-4 h-4 accent-primary rounded cursor-pointer mt-0.5 shrink-0"
+                    checked={formData.consentimento_marketing}
+                    onChange={(e) => setFormData({ ...formData, consentimento_marketing: e.target.checked })}
+                  />
+                  <label htmlFor="consentimento_marketing_chk" className="text-xs text-white/70 select-none cursor-pointer leading-tight">
+                    Aceito receber contatos com promoções, novidades e ofertas de marketing da Ótica Lis.
+                  </label>
+                </div>
+              </div>
+            </div>
           </form>
         </div>
 

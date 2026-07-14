@@ -59,7 +59,6 @@ const checkBusinessHours = (config: any) => {
   const minutes = now.getMinutes();
   const currentTotalMins = hours * 60 + minutes;
 
-  // Se dias úteis for verdadeiro e for Fim de semana (0 = Dom, 6 = Sáb)
   if (config.dias_uteis && (now.getDay() === 0 || now.getDay() === 6)) {
     return false;
   }
@@ -95,22 +94,23 @@ async function agendarFollowUpLeadsFrios() {
       const diasFrio = config.dias_frio || 3;
       const dataLimite = new Date(Date.now() - diasFrio * 24 * 60 * 60 * 1000).toISOString();
 
-      // Busca leads sem contato há X dias em estágios ativos
+      // Busca leads (clientes com tipo = 'lead') sem contato há X dias em estágios ativos na base unificada
       const { data: leadsFrios } = await supabase
-        .from('leads')
+        .from('clientes')
         .select('id, estagio, tenant_id')
         .eq('tenant_id', config.tenant_id)
+        .eq('tipo', 'lead')
         .in('estagio', ['novo', 'contatado', 'exame_agendado'])
         .lt('ultimo_contato_em', dataLimite);
 
       if (!leadsFrios || leadsFrios.length === 0) continue;
 
       for (const lead of leadsFrios) {
-        // Verifica se já existe um envio pendente na fila para este lead
+        // Verifica se já existe um envio pendente na fila para este lead (cliente_id)
         const { data: existente } = await supabase
           .from('pos_venda_envios')
           .select('id')
-          .eq('lead_id', lead.id)
+          .eq('cliente_id', lead.id)
           .eq('status', 'pendente')
           .limit(1);
 
@@ -119,7 +119,7 @@ async function agendarFollowUpLeadsFrios() {
         // Agenda o follow-up
         await supabase.from('pos_venda_envios').insert([{
           tenant_id: lead.tenant_id,
-          lead_id: lead.id,
+          cliente_id: lead.id,
           status: 'pendente',
           agendado_para: new Date().toISOString(),
           tipo_gatilho: 'follow_up_lead_frio',
@@ -139,10 +139,10 @@ async function processarExamesVencidos() {
   try {
     const hoje = new Date().toISOString().split('T')[0];
 
-    // Busca agendamentos de vista no status "AGENDADO" cuja data passou e são associados a um lead
+    // Busca agendamentos de vista no status "AGENDADO" cuja data passou
     const { data: examesVencidos, error: examError } = await supabase
       .from('agendamentos')
-      .select('id, data, lead_id, leads(id, estagio, tenant_id)')
+      .select('id, data, cliente_id, clientes(id, estagio, tenant_id, tipo)')
       .eq('status', 'AGENDADO')
       .lt('data', hoje);
 
@@ -152,22 +152,22 @@ async function processarExamesVencidos() {
     }
 
     for (const ag of examesVencidos) {
-      const lead = ag.leads as any;
-      if (lead && lead.estagio === 'exame_agendado') {
+      const client = ag.clientes as any;
+      if (client && client.tipo === 'lead' && client.estagio === 'exame_agendado') {
         // 1. Atualiza status do agendamento
         await supabase.from('agendamentos').update({ status: 'NAO_COMPARECEU' }).eq('id', ag.id);
 
         // 2. Retorna o lead para contatado (fila de follow-up de não-apareceu)
-        await supabase.from('leads').update({
+        await supabase.from('clientes').update({
           estagio: 'contatado',
           ultimo_contato_em: new Date().toISOString(),
           atualizado_em: new Date().toISOString()
-        }).eq('id', lead.id);
+        }).eq('id', client.id);
 
         // 3. Grava o evento na timeline
         await supabase.from('lead_eventos').insert([{
-          lead_id: lead.id,
-          tenant_id: lead.tenant_id,
+          lead_id: client.id,
+          tenant_id: client.tenant_id,
           tipo: 'mudou_estagio',
           de_estagio: 'exame_agendado',
           para_estagio: 'contatado',
@@ -175,11 +175,173 @@ async function processarExamesVencidos() {
           em: new Date().toISOString()
         }]);
 
-        console.log(`[Follow-Up Leads] Lead ${lead.id} não compareceu ao exame. Movido de volta para contatado.`);
+        console.log(`[Follow-Up Leads] Lead ${client.id} não compareceu ao exame. Movido de volta para contatado.`);
       }
     }
   } catch (err) {
     console.error('[Follow-Up Leads] Erro ao rodar rotina de exames vencidos:', err);
+  }
+}
+
+// FILA DE DISPAROS DE CAMPANHAS DE MARKETING / REMARKETING (Parte 4)
+async function processarCampanhaDisparosQueue(config: any, slots: number) {
+  if (slots <= 0) return 0;
+  
+  console.log(`[Campanhas] Loja ${config.tenant_id} processando até ${slots} disparos de campanhas...`);
+  
+  try {
+    const { data: disparos, error: queueError } = await supabase
+      .from('campanha_disparos')
+      .select(`
+        id,
+        campanha_id,
+        cliente_id,
+        tenant_id,
+        campanhas (
+          nome,
+          template_mensagem,
+          tipo_campanha
+        ),
+        clientes (
+          nome_completo,
+          whatsapp,
+          email,
+          opt_in_marketing,
+          base_legal,
+          status_crm
+        )
+      `)
+      .eq('tenant_id', config.tenant_id)
+      .eq('status', 'pendente')
+      .order('criado_em', { ascending: true })
+      .limit(slots);
+
+    if (queueError) {
+      console.error('[Campanhas] Erro ao ler fila de disparos:', queueError);
+      return 0;
+    }
+
+    if (!disparos || disparos.length === 0) return 0;
+
+    let enviadosCont = 0;
+
+    for (const disparo of disparos) {
+      const cliente = disparo.clientes as any;
+      const campanha = disparo.campanhas as any;
+      const tipoCampanha = campanha?.tipo_campanha || 'marketing';
+
+      if (!cliente) {
+        await supabase.from('campanha_disparos').update({
+          status: 'falha',
+          erro_log: 'Cliente não encontrado'
+        }).eq('id', disparo.id);
+        continue;
+      }
+
+      // 1. Checagem de Supressão (Opt-out global)
+      const formattedPhone = formatPhoneWAHA(cliente.whatsapp);
+      const { data: suprimido } = await supabase
+        .from('lista_supressao')
+        .select('id')
+        .eq('tenant_id', disparo.tenant_id)
+        .eq('whatsapp', formattedPhone)
+        .limit(1);
+
+      const isSuprimido = (suprimido && suprimido.length > 0) || (cliente.status_crm === 'suprimido');
+
+      if (isSuprimido) {
+        await supabase.from('campanha_disparos').update({
+          status: 'falha',
+          erro_log: 'LGPD Bloqueio: Cliente optou por descadastro (Supressão Global)'
+        }).eq('id', disparo.id);
+        continue;
+      }
+
+      // 2. Checagem de Base Legal conforme o tipo da campanha
+      let baseLegalValida = false;
+      let motivoBloqueio = '';
+
+      if (tipoCampanha === 'marketing') {
+        if (cliente.opt_in_marketing === true && cliente.base_legal === 'consentimento') {
+          baseLegalValida = true;
+        } else {
+          motivoBloqueio = 'LGPD Bloqueio: Campanha de Marketing exige Opt-in de Consentimento ativo';
+        }
+      } else {
+        if (cliente.base_legal === 'consentimento' || cliente.base_legal === 'legitimo_interesse') {
+          baseLegalValida = true;
+        } else {
+          motivoBloqueio = 'LGPD Bloqueio: Sem base legal (Consentimento ou Legítimo Interesse) para relacionamento';
+        }
+      }
+
+      if (!baseLegalValida) {
+        await supabase.from('campanha_disparos').update({
+          status: 'falha',
+          erro_log: motivoBloqueio
+        }).eq('id', disparo.id);
+        continue;
+      }
+
+      if (!cliente.whatsapp) {
+        await supabase.from('campanha_disparos').update({
+          status: 'falha',
+          erro_log: 'Cliente sem WhatsApp cadastrado'
+        }).eq('id', disparo.id);
+        continue;
+      }
+
+      // 3. Montar e Enviar a Mensagem
+      let texto = campanha.template_mensagem || '';
+      texto = texto.replace(/\{\{nome\}\}/g, cliente.nome_completo.split(' ')[0]);
+      texto += '\n\n*(Responda PARE para não receber mais mensagens)*';
+
+      try {
+        await sendWahaMessage(formattedPhone, texto);
+
+        await supabase.from('campanha_disparos').update({
+          status: 'enviado',
+          mensagem_processada: texto,
+          data_envio: new Date().toISOString()
+        }).eq('id', disparo.id);
+
+        enviadosCont++;
+        console.log(`✅ [Campanha: ${campanha.nome}] Enviada para ${cliente.nome_completo} (${formattedPhone})`);
+
+      } catch (err: any) {
+        console.error(`❌ Falha no disparo de campanha para ${formattedPhone}:`, err.message);
+        await supabase.from('campanha_disparos').update({
+          status: 'falha',
+          erro_log: err.message
+        }).eq('id', disparo.id);
+      }
+
+      // Delay anti-ban entre disparos de campanhas
+      const waitTime = randomInt(config.min_delay_s, config.max_delay_s) * 1000;
+      console.log(`[Anti-ban] Aguardando ${waitTime/1000}s para a próxima mensagem de campanha...`);
+      await delay(waitTime);
+    }
+
+    // Se processou toda a fila da campanha, atualiza status da campanha para concluída
+    for (const d of disparos) {
+      const { count: pendentesRestantes } = await supabase
+        .from('campanha_disparos')
+        .select('id', { count: 'exact', head: true })
+        .eq('campanha_id', d.campanha_id)
+        .eq('status', 'pendente');
+      
+      if ((pendentesRestantes || 0) === 0) {
+        await supabase
+          .from('campanhas')
+          .update({ status: 'concluida', atualizado_em: new Date().toISOString() })
+          .eq('id', d.campanha_id);
+      }
+    }
+
+    return enviadosCont;
+  } catch (err) {
+    console.error('[Campanhas] Erro global na fila de campanhas:', err);
+    return 0;
   }
 }
 
@@ -191,6 +353,7 @@ export async function processPosVendaQueue() {
     // Processamento de regras de Leads
     await processarExamesVencidos();
     await agendarFollowUpLeadsFrios();
+
     // 1. Puxar Configurações Ativas das Lojas
     const { data: configs, error: configError } = await supabase
       .from('pos_venda_config')
@@ -210,41 +373,51 @@ export async function processPosVendaQueue() {
       }
 
       // 3. Verificar cota diária
-      // Puxa quantos envios já foram feitos hoje para este tenant
       const today = new Date().toISOString().split('T')[0];
-      const { count: dailyCount } = await supabase
+      
+      // Contar envios de pós-venda hoje
+      const { count: posVendaCount } = await supabase
         .from('pos_venda_envios')
         .select('id', { count: 'exact', head: true })
         .eq('tenant_id', config.tenant_id)
         .eq('status', 'enviado')
         .gte('enviado_em', `${today}T00:00:00Z`);
 
-      const currentDailyCount = dailyCount || 0;
-      if (currentDailyCount >= config.teto_diario) {
-        console.log(`[Pós-Venda] Teto diário de ${config.teto_diario} alcançado para loja ${config.tenant_id}.`);
+      // Contar envios de campanhas hoje
+      const { count: campanhaCount } = await supabase
+        .from('campanha_disparos')
+        .select('id', { count: 'exact', head: true })
+        .eq('tenant_id', config.tenant_id)
+        .eq('status', 'enviado')
+        .gte('data_envio', `${today}T00:00:00Z`);
+
+      const totalEnviosHoje = (posVendaCount || 0) + (campanhaCount || 0);
+
+      if (totalEnviosHoje >= config.teto_diario) {
+        console.log(`[Pós-Venda/Campanhas] Teto diário de ${config.teto_diario} alcançado para loja ${config.tenant_id}.`);
         continue;
       }
 
-      const availableSlots = config.teto_diario - currentDailyCount;
+      const availableSlots = config.teto_diario - totalEnviosHoje;
 
-      // 4. Puxar fila pendente agendada para hoje ou antes
+      // 4. Puxar fila de pós-venda pendente agendada para hoje ou antes
       const { data: pendentes, error: queueError } = await supabase
         .from('pos_venda_envios')
         .select(`
           id, 
           marco_dia,
           cliente_id,
-          lead_id,
           tenant_id,
+          tipo_gatilho,
           clientes (
-            nome,
+            id,
+            nome_completo,
             whatsapp,
-            consentimento_marketing
-          ),
-          leads (
-            nome,
-            telefone,
-            opt_in,
+            email,
+            opt_in_marketing,
+            base_legal,
+            status_crm,
+            tipo,
             estagio
           )
         `)
@@ -254,146 +427,169 @@ export async function processPosVendaQueue() {
         .limit(availableSlots);
 
       if (queueError) {
-        console.error('Erro ao ler a fila:', queueError);
+        console.error('Erro ao ler a fila de pós-venda:', queueError);
         continue;
       }
 
-      if (!pendentes || pendentes.length === 0) {
-        continue;
-      }
+      let enviosEfetuados = 0;
 
-      console.log(`[Pós-Venda] Loja ${config.tenant_id} tem ${pendentes.length} mensagens pendentes.`);
+      if (pendentes && pendentes.length > 0) {
+        console.log(`[Pós-Venda] Loja ${config.tenant_id} tem ${pendentes.length} mensagens pendentes.`);
 
-      // 5. Processar fila
-      for (const envio of pendentes) {
-        const isLead = Boolean(envio.lead_id);
-        const cliente = envio.clientes as any;
-        const lead = envio.leads as any;
+        // 5. Processar fila de pós-venda
+        for (const envio of pendentes) {
+          const cliente = envio.clientes as any;
+          if (!cliente) continue;
 
-        const nome = isLead ? lead?.nome : cliente?.nome;
-        const whatsapp = isLead ? lead?.telefone : cliente?.whatsapp;
-        const optIn = isLead ? lead?.opt_in : cliente?.consentimento_marketing;
+          const isLead = cliente.tipo === 'lead';
+          const nome = cliente.nome_completo;
+          const whatsapp = cliente.whatsapp;
+          const optIn = cliente.opt_in_marketing;
+          const baseLegal = cliente.base_legal;
 
-        if (!nome || !whatsapp) {
-          await supabase.from('pos_venda_envios').update({
-            status: 'falha',
-            erro_log: isLead ? 'Lead sem Nome ou Telefone' : 'Cliente sem Nome ou WhatsApp'
-          }).eq('id', envio.id);
-          continue;
-        }
+          const isMarketing = envio.tipo_gatilho === 'campanha_marketing' || envio.tipo_gatilho === 'follow_up_lead_frio';
 
-        // Regra LGPD: Consentimento Negado
-        if (optIn === false) {
-          await supabase.from('pos_venda_envios').update({
-            status: 'cancelado',
-            motivo_cancelamento: 'Opt-out (Sem consentimento)'
-          }).eq('id', envio.id);
-          continue;
-        }
-
-        // Regra LGPD: Verificar lista de supressão global
-        const { data: suprimido } = await supabase
-          .from('lista_supressao')
-          .select('id')
-          .eq('tenant_id', envio.tenant_id)
-          .eq('whatsapp', formatPhoneWAHA(whatsapp))
-          .limit(1);
-
-        if (suprimido && suprimido.length > 0) {
-          await supabase.from('pos_venda_envios').update({
-            status: 'cancelado',
-            motivo_cancelamento: 'Opt-out (Presente na lista de supressão global)'
-          }).eq('id', envio.id);
-          continue;
-        }
-
-        let texto = '';
-        let varIndex = 0;
-
-        if (isLead) {
-          // Puxa as configurações de templates do lead para o tenant
-          const { data: leadConfig } = await supabase
-            .from('leads_config')
-            .select('templates')
+          // Regra LGPD 1: Verificar se está na lista de supressão global (opt-out)
+          const formattedPhone = formatPhoneWAHA(whatsapp);
+          const { data: suprimido } = await supabase
+            .from('lista_supressao')
+            .select('id')
             .eq('tenant_id', envio.tenant_id)
-            .single();
+            .eq('whatsapp', formattedPhone)
+            .limit(1);
 
-          const templates = leadConfig?.templates?.[lead.estagio] || [];
-          if (!templates || templates.length === 0) {
-             await supabase.from('pos_venda_envios').update({
-              status: 'falha',
-              erro_log: `Nenhum template de lead encontrado para o estágio ${lead.estagio}`
+          const isSuprimido = (suprimido && suprimido.length > 0) || (cliente.status_crm === 'suprimido');
+
+          if (isSuprimido) {
+            await supabase.from('pos_venda_envios').update({
+              status: 'cancelado',
+              motivo_cancelamento: 'LGPD Bloqueio: Cliente optou por descadastro (Supressão Global)'
             }).eq('id', envio.id);
             continue;
           }
 
-          varIndex = randomInt(0, templates.length - 1);
-          texto = templates[varIndex];
-        } else {
-          // Escolher Template Aleatório de pós-venda para variação (Anti-ban)
-          const templates = config.templates[String(envio.marco_dia)];
-          if (!templates || templates.length === 0) {
-             await supabase.from('pos_venda_envios').update({
-              status: 'falha',
-              erro_log: `Nenhum template encontrado para marco ${envio.marco_dia}`
+          // Regra LGPD 2: Verificar base legal conforme o tipo de disparo
+          let baseLegalValida = false;
+          let motivoBloqueio = '';
+
+          if (isMarketing) {
+            if (optIn === true && baseLegal === 'consentimento') {
+              baseLegalValida = true;
+            } else {
+              motivoBloqueio = 'LGPD Bloqueio: Campanha de Marketing exige Opt-in de Consentimento ativo';
+            }
+          } else {
+            if (baseLegal === 'consentimento' || baseLegal === 'legitimo_interesse') {
+              baseLegalValida = true;
+            } else {
+              motivoBloqueio = 'LGPD Bloqueio: Sem base legal (Consentimento ou Legítimo Interesse) para relacionamento';
+            }
+          }
+
+          if (!baseLegalValida) {
+            await supabase.from('pos_venda_envios').update({
+              status: 'cancelado',
+              motivo_cancelamento: motivoBloqueio
             }).eq('id', envio.id);
             continue;
           }
 
-          varIndex = randomInt(0, templates.length - 1);
-          texto = templates[varIndex];
-        }
-        
-        // Substituir Variáveis
-        texto = texto.replace(/\{\{nome\}\}/g, nome.split(' ')[0]);
-        // Opt-out text
-        texto += '\n\n*(Responda PARE para não receber mais mensagens)*';
+          if (!whatsapp) {
+            await supabase.from('pos_venda_envios').update({
+              status: 'falha',
+              erro_log: 'WhatsApp não cadastrado'
+            }).eq('id', envio.id);
+            continue;
+          }
 
-        const chatId = formatPhoneWAHA(whatsapp);
+          let texto = '';
+          let varIndex = 0;
 
-        try {
-          // Disparo da API WAHA
-          await sendWahaMessage(chatId, texto);
-
-          // Atualiza registro com SUCESSO
-          await supabase.from('pos_venda_envios').update({
-            status: 'enviado',
-            enviado_em: new Date().toISOString(),
-            template_usado: texto,
-            variacao_index: varIndex
-          }).eq('id', envio.id);
-
-          // Se for lead, registrar o evento de mensagem enviada na timeline
           if (isLead) {
-            await supabase.from('leads').update({
-              ultimo_contato_em: new Date().toISOString(),
-              atualizado_em: new Date().toISOString()
-            }).eq('id', envio.lead_id);
+            // Puxa as configurações de templates do lead para o tenant
+            const { data: leadConfig } = await supabase
+              .from('leads_config')
+              .select('templates')
+              .eq('tenant_id', envio.tenant_id)
+              .single();
 
-            await supabase.from('lead_eventos').insert([{
-              lead_id: envio.lead_id,
-              tenant_id: envio.tenant_id,
-              tipo: 'mensagem_enviada',
-              conteudo: texto,
-              em: new Date().toISOString()
-            }]);
+            const templates = leadConfig?.templates?.[cliente.estagio] || [];
+            if (!templates || templates.length === 0) {
+               await supabase.from('pos_venda_envios').update({
+                status: 'falha',
+                erro_log: `Nenhum template de lead encontrado para o estágio ${cliente.estagio}`
+              }).eq('id', envio.id);
+              continue;
+            }
+
+            varIndex = randomInt(0, templates.length - 1);
+            texto = templates[varIndex];
+          } else {
+            // Escolher Template Aleatório de pós-venda para variação (Anti-ban)
+            const templates = config.templates[String(envio.marco_dia)];
+            if (!templates || templates.length === 0) {
+               await supabase.from('pos_venda_envios').update({
+                status: 'falha',
+                erro_log: `Nenhum template encontrado para marco ${envio.marco_dia}`
+              }).eq('id', envio.id);
+              continue;
+            }
+
+            varIndex = randomInt(0, templates.length - 1);
+            texto = templates[varIndex];
+          }
+          
+          texto = texto.replace(/\{\{nome\}\}/g, nome.split(' ')[0]);
+          texto += '\n\n*(Responda PARE para não receber mais mensagens)*';
+
+          try {
+            await sendWahaMessage(formattedPhone, texto);
+
+            await supabase.from('pos_venda_envios').update({
+              status: 'enviado',
+              enviado_em: new Date().toISOString(),
+              template_usado: texto,
+              variacao_index: varIndex
+            }).eq('id', envio.id);
+
+            enviosEfetuados++;
+
+            // Se for lead, registrar o evento de mensagem enviada na timeline
+            if (isLead) {
+              await supabase.from('clientes').update({
+                ultimo_contato_em: new Date().toISOString(),
+                atualizado_em: new Date().toISOString()
+              }).eq('id', envio.cliente_id);
+
+              await supabase.from('lead_eventos').insert([{
+                lead_id: envio.cliente_id,
+                tenant_id: envio.tenant_id,
+                tipo: 'mensagem_enviada',
+                conteudo: texto,
+                em: new Date().toISOString()
+              }]);
+            }
+
+            console.log(`✅ [D+${envio.marco_dia}] Enviado para ${nome} (${formattedPhone})`);
+
+          } catch (err: any) {
+            console.error(`❌ Falha ao enviar pós-venda para ${formattedPhone}:`, err.message);
+            await supabase.from('pos_venda_envios').update({
+              status: 'falha',
+              erro_log: err.message
+            }).eq('id', envio.id);
           }
 
-          console.log(`✅ [D+${envio.marco_dia}] Enviado para ${cliente.nome} (${chatId})`);
-
-        } catch (err: any) {
-          console.error(`❌ Falha ao enviar para ${chatId}:`, err.message);
-          // Atualiza registro com FALHA
-          await supabase.from('pos_venda_envios').update({
-            status: 'falha',
-            erro_log: err.message
-          }).eq('id', envio.id);
+          // Delay anti-ban
+          const waitTime = randomInt(config.min_delay_s, config.max_delay_s) * 1000;
+          await delay(waitTime);
         }
+      }
 
-        // DELAY ANTI-BAN ENTRE ENVIOS (ex: 30 a 90 segundos)
-        const waitTime = randomInt(config.min_delay_s, config.max_delay_s) * 1000;
-        console.log(`[Anti-ban] Aguardando ${waitTime/1000}s até a próxima mensagem...`);
-        await delay(waitTime);
+      // 6. Processar a fila de Campanhas de Marketing se restarem slots livres na cota diária
+      const remainingSlots = availableSlots - enviosEfetuados;
+      if (remainingSlots > 0) {
+        await processarCampanhaDisparosQueue(config, remainingSlots);
       }
     }
 

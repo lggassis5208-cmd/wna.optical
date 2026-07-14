@@ -215,45 +215,92 @@ export const segmentosService = {
     }
   },
 
-  async evaluateSegmentoCount(ast: RuleGroup): Promise<EvaluationResult> {
+  async evaluateSegmentoCount(ast: RuleGroup, tipoCampanha: 'marketing' | 'relacionamento' = 'marketing'): Promise<EvaluationResult> {
     try {
       if (!isSupabaseConfigured()) {
-        return { count: 0, sample: [] };
+        return { count: 0, totalFiltro: 0, excluidosSupressao: 0, excluidosConsentimento: 0, sample: [] };
       }
 
       const filterString = buildFilterString(ast);
       
-      let query = supabase.from('v_clientes_metricas').select('cliente_id', { count: 'exact' });
-      
-      // Aplicar filtro AST gerado
+      // 1. Total Filtro (Bate com os critérios geográficos/clínicos/comerciais)
+      let queryFiltro = supabase.from('v_clientes_metricas').select('cliente_id', { count: 'exact', head: true });
       if (filterString) {
-        query = query.or(filterString); // Injeta a string de query
+        queryFiltro = queryFiltro.or(filterString);
       }
+      const { count: countFiltro, error: errFiltro } = await queryFiltro;
+      if (errFiltro) throw errFiltro;
+      const totalFiltro = countFiltro || 0;
 
-      // REGRA OBRIGATÓRIA DA LGPD: Exclui supressão
-      query = query.eq('consentimento_marketing', true);
+      // 2. Excluídos por Supressão (esta_suprimido = true)
+      let querySupressao = supabase.from('v_clientes_metricas')
+        .select('cliente_id', { count: 'exact', head: true })
+        .eq('esta_suprimido', true);
+      if (filterString) {
+        querySupressao = querySupressao.or(filterString);
+      }
+      const { count: countSupressao, error: errSupressao } = await querySupressao;
+      if (errSupressao) throw errSupressao;
+      const excluidosSupressao = countSupressao || 0;
 
-      // Executa contagem limitando o select para não trafegar muita coisa
-      const { data: clients, count, error } = await query.limit(20);
-      if (error) throw error;
+      // 3. Excluídos por Consentimento (não suprimidos, mas sem base legal)
+      let queryConsentimento = supabase.from('v_clientes_metricas')
+        .select('cliente_id', { count: 'exact', head: true })
+        .eq('esta_suprimido', false);
+
+      if (tipoCampanha === 'marketing') {
+        queryConsentimento = queryConsentimento.eq('opt_in_marketing', false);
+      } else {
+        queryConsentimento = queryConsentimento.not('base_legal', 'in', '("consentimento","legitimo_interesse")');
+      }
+      if (filterString) {
+        queryConsentimento = queryConsentimento.or(filterString);
+      }
+      const { count: countConsentimento, error: errConsentimento } = await queryConsentimento;
+      if (errConsentimento) throw errConsentimento;
+      const excluidosConsentimento = countConsentimento || 0;
+
+      // 4. Elegíveis
+      let queryElegivel = supabase.from('v_clientes_metricas')
+        .select('cliente_id, nome, email, whatsapp', { count: 'exact' })
+        .eq('esta_suprimido', false);
+
+      if (tipoCampanha === 'marketing') {
+        queryElegivel = queryElegivel.eq('opt_in_marketing', true);
+      } else {
+        queryElegivel = queryElegivel.in('base_legal', ['consentimento', 'legitimo_interesse']);
+      }
+      if (filterString) {
+        queryElegivel = queryElegivel.or(filterString);
+      }
+      
+      const { data: clients, count: countElegivel, error: errElegivel } = await queryElegivel.limit(20);
+      if (errElegivel) throw errElegivel;
+
+      const totalElegivel = countElegivel || 0;
 
       if (!clients || clients.length === 0) {
-        return { count: count || 0, sample: [] };
+        return { count: totalElegivel, totalFiltro, excluidosSupressao, excluidosConsentimento, sample: [] };
       }
 
-      // Chama a RPC de mascaramento para a amostra
-      const clientIds = clients.map(c => c.cliente_id);
-      const { data: sampleData, error: rpcError } = await supabase.rpc('mask_sample_data', { client_ids: clientIds });
-      
-      if (rpcError) {
-        console.warn('RPC mask_sample_data não encontrada ou falhou. O banco de dados está desatualizado.', rpcError);
-        return { count: count || 0, sample: [] };
-      }
+      // Mascara a amostra de dados
+      const sample = clients.map(c => ({
+        nome: c.nome.split(' ').map((n: string, idx: number) => idx === 0 ? n : '***').join(' '),
+        whatsapp_mascarado: c.whatsapp ? c.whatsapp.substring(0, 4) + '****' + c.whatsapp.substring(c.whatsapp.length - 2) : 'Sem WhatsApp',
+        email_mascarado: c.email ? c.email.substring(0, 3) + '***@***.com' : 'Sem E-mail'
+      }));
 
-      return { count: count || 0, sample: sampleData || [] };
+      return {
+        count: totalElegivel,
+        totalFiltro,
+        excluidosSupressao,
+        excluidosConsentimento,
+        sample
+      };
+
     } catch (e) {
-      console.error('Erro no evaluateSegmentoCount:', e);
-      throw e;
+      console.error('Erro ao avaliar contagem de segmento:', e);
+      return { count: 0, totalFiltro: 0, excluidosSupressao: 0, excluidosConsentimento: 0, sample: [] };
     }
   }
 };
