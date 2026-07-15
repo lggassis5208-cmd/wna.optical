@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { toast } from 'sonner';
 
 // Utility to check if Supabase is actually configured
 const isSupabaseConfigured = () => {
@@ -76,17 +77,31 @@ export const storage = {
   async getClients() {
     if (isSupabaseConfigured()) {
       try {
-        const { data, error } = await supabase.from('clientes').select('*').order('criado_em', { ascending: false });
-        if (!error && data) {
+        let { data, error } = await supabase.from('clientes').select('*').order('created_at', { ascending: false });
+        
+        if (error && (error.code === '42703' || error.message.includes('created_at'))) {
+          console.warn('created_at não existe no clientes, tentando criado_em...');
+          const retry = await supabase.from('clientes').select('*').order('criado_em', { ascending: false });
+          data = retry.data;
+          error = retry.error;
+        }
+
+        if (error) {
+          console.error('Erro de select no Supabase para clientes:', error);
+          toast.error('Falha de sincronização com o banco de dados dos clientes.');
+          throw error;
+        }
+        if (data) {
           // Mapear nome -> name para compatibilidade com componentes existentes
           return data.map((c: any) => ({ ...c, name: c.nome || c.nome_completo }));
         }
-        console.warn('Supabase select error', error);
       } catch (e) {
-        console.error('Supabase fetch error, using LocalStorage', e);
+        console.error('Falha crítica na conexão com o Supabase para clientes:', e);
+        toast.error('Erro de conexão com o banco de dados. Exibindo clientes locais offline.');
       }
     }
-    return JSON.parse(localStorage.getItem('lis_clientes') || '[]');
+    const clients = JSON.parse(localStorage.getItem('lis_clientes') || '[]');
+    return clients.map((c: any) => ({ ...c, name: c.nome || c.nome_completo || c.name }));
   },
 
   async getClientById(id: string) {
@@ -147,11 +162,27 @@ export const storage = {
   async getExames() {
     if (isSupabaseConfigured()) {
       try {
-        const { data, error } = await supabase.from('agendamentos').select(`
+        let { data, error } = await supabase.from('agendamentos').select(`
           *,
           clientes (id, nome_completo, cpf, whatsapp)
-        `).order('data_agendamento', { ascending: true });
-        if (!error && data) {
+        `).order('data', { ascending: true });
+        
+        if (error && (error.code === '42703' || error.message.includes('data'))) {
+          console.warn('data não existe no agendamentos, tentando data_agendamento...');
+          const retry = await supabase.from('agendamentos').select(`
+            *,
+            clientes (id, nome_completo, cpf, whatsapp)
+          `).order('data_agendamento', { ascending: true });
+          data = retry.data;
+          error = retry.error;
+        }
+
+        if (error) {
+          console.error('Supabase agendamentos select error', error);
+          toast.error('Falha de sincronização com o banco de dados dos agendamentos.');
+          throw error;
+        }
+        if (data) {
           return data.map((ag: any) => ({
             ...ag,
             paciente_nome: ag.clientes?.nome_completo || '',
@@ -159,9 +190,9 @@ export const storage = {
             paciente_whatsapp: ag.clientes?.whatsapp || ''
           }));
         }
-        console.warn('Supabase agendamentos select error', error);
       } catch (e) {
-        console.warn('Supabase error, using LocalStorage', e);
+        console.error('Falha crítica na conexão com o Supabase para agendamentos:', e);
+        toast.error('Erro de conexão com o banco de dados. Exibindo agendamentos locais offline.');
       }
     }
     return JSON.parse(localStorage.getItem('lis_exames') || '[]');
@@ -222,59 +253,28 @@ export const storage = {
   async getSales() {
     if (isSupabaseConfigured()) {
       try {
-        const { data, error } = await supabase.from('vendas').select('*').order('created_at', { ascending: false });
-        if (!error) return data;
-        console.warn('Supabase select error', error);
-      } catch (e) {
-        console.error('Supabase fetch error, using LocalStorage', e);
+        let { data, error } = await supabase.from('vendas').select('*').order('criado_em', { ascending: false });
+        
+        if (error && (error.code === '42703' || error.message.includes('criado_em'))) {
+          console.warn('criado_em não existe no vendas, tentando created_at...');
+          const retry = await supabase.from('vendas').select('*').order('created_at', { ascending: false });
+          data = retry.data;
+          error = retry.error;
+        }
+
+        if (error) {
+          console.error('Erro de select no Supabase para vendas:', error);
+          toast.error('Falha de sincronização com o banco de dados das vendas.');
+          throw error;
+        }
+        return data;
+      } catch (e: any) {
+        console.error('Falha crítica na conexão com o Supabase para vendas:', e);
+        toast.error('Erro de conexão com o banco de dados. Exibindo vendas locais offline.');
       }
     }
     console.log('Fetching sales from LocalStorage');
     return JSON.parse(localStorage.getItem('lis_vendas') || '[]');
-  },
-
-  // --- AGENDA / EXAMES ---
-  async saveExame(exame: any) {
-    if (isSupabaseConfigured()) {
-      try {
-        const { data, error } = await supabase.from('exames').insert([exame]).select();
-        if (!error) return data;
-      } catch (e) {
-        console.warn('Supabase error, falling back to LocalStorage', e);
-      }
-    }
-    const exames = JSON.parse(localStorage.getItem('lis_exames') || '[]');
-    const newExame = { 
-      ...exame, 
-      id: Math.random().toString(36).substr(2, 9), 
-      criado_em: new Date().toISOString() 
-    };
-    exames.push(newExame);
-    localStorage.setItem('lis_exames', JSON.stringify(exames));
-    return newExame;
-  },
-
-  async getExames() {
-    if (isSupabaseConfigured()) {
-      try {
-        const { data, error } = await supabase.from('exames').select('*').order('created_at', { ascending: true });
-        if (!error) return data;
-      } catch (e) {
-        console.warn('Supabase error, using LocalStorage', e);
-      }
-    }
-    return JSON.parse(localStorage.getItem('lis_exames') || '[]');
-  },
-
-  async updateExameStatus(id: string, status: string) {
-    const exames = await this.getExames();
-    const index = exames.findIndex((e: any) => e.id === id);
-    if (index !== -1) {
-      exames[index].status = status;
-      localStorage.setItem('lis_exames', JSON.stringify(exames));
-      return exames[index];
-    }
-    return null;
   },
 
   // --- CAIXA DIÁRIO ---

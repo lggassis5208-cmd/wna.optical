@@ -85,11 +85,13 @@ export default function SegmentosPage() {
         </button>
       </div>
 
-      <SegmentBuilderModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        onSuccess={loadSegmentos} 
-      />
+      <ErrorBoundary fallbackMessage="O construtor de segmentos encontrou um problema e falhou ao carregar.">
+        <SegmentBuilderModal 
+          isOpen={isModalOpen} 
+          onClose={() => setIsModalOpen(false)} 
+          onSuccess={loadSegmentos} 
+        />
+      </ErrorBoundary>
 
       {/* Cards de Métricas */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

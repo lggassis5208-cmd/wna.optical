@@ -1,5 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { AlertTriangle } from 'lucide-react';
+import { ShieldAlert } from 'lucide-react';
 
 interface Props {
   children: ReactNode;
@@ -8,12 +8,13 @@ interface Props {
 
 interface State {
   hasError: boolean;
-  error?: Error;
+  error: Error | null;
 }
 
 export class ErrorBoundary extends Component<Props, State> {
   public state: State = {
-    hasError: false
+    hasError: false,
+    error: null
   };
 
   public static getDerivedStateFromError(error: Error): State {
@@ -21,30 +22,28 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('Uncaught error:', error, errorInfo);
+    console.error('Erro capturado pelo ErrorBoundary:', error, errorInfo);
   }
 
   public render() {
     if (this.state.hasError) {
       return (
-        <div className="p-6 bg-red-500/10 border border-red-500/20 rounded-2xl flex flex-col items-center justify-center text-center space-y-4">
-          <AlertTriangle size={48} className="text-red-500" />
-          <div>
-            <h2 className="text-xl font-bold text-red-500 mb-2">Algo deu errado neste módulo</h2>
-            <p className="text-white/60 text-sm max-w-md mx-auto">
-              {this.props.fallbackMessage || 'Ocorreu um erro inesperado ao renderizar este componente.'}
-            </p>
-            {this.state.error && (
-              <div className="mt-4 p-4 bg-black/40 rounded-lg text-left overflow-x-auto">
-                <code className="text-xs text-red-400 font-mono">
-                  {this.state.error.toString()}
-                </code>
-              </div>
-            )}
+        <div className="bg-red-500/10 border border-red-500/20 rounded-3xl p-6 space-y-4 max-w-lg mx-auto my-8 text-center animate-in fade-in">
+          <div className="flex justify-center text-red-500">
+            <ShieldAlert size={48} />
           </div>
+          <h3 className="text-lg font-bold text-white">Ops! Algo deu errado neste módulo</h3>
+          <p className="text-xs text-white/60">
+            {this.props.fallbackMessage || 'Ocorreu um erro inesperado ao carregar esta seção do sistema.'}
+          </p>
+          {this.state.error && (
+            <pre className="bg-black/30 p-4 rounded-xl text-[10px] text-red-400 font-mono text-left max-h-40 overflow-y-auto whitespace-pre-wrap">
+              {this.state.error.toString()}
+            </pre>
+          )}
           <button
-            onClick={() => this.setState({ hasError: false, error: undefined })}
-            className="px-4 py-2 bg-red-500/20 text-red-400 font-bold rounded-lg hover:bg-red-500/30 transition-colors mt-4"
+            onClick={() => this.setState({ hasError: false, error: null })}
+            className="bg-white/5 border border-white/10 hover:bg-white/10 text-white font-bold py-2 px-6 rounded-xl text-xs transition-colors"
           >
             Tentar Novamente
           </button>

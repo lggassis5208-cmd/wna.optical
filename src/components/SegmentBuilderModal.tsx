@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { X, Plus, Trash2, Filter, Loader2, AlertTriangle, CheckCircle, ShieldAlert, Users, Search } from 'lucide-react';
+import { X, Plus, Trash2, Filter, Loader2, AlertTriangle, CheckCircle, ShieldAlert, Users, Search, Calendar, Clock, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import { 
   segmentosService, 
@@ -11,8 +11,6 @@ import {
   OPERATORS_BY_TYPE,
   type EvaluationResult
 } from '../lib/services/segmentosService';
-
-import { Calendar, Clock, Star, Users as UsersIcon } from 'lucide-react';
 
 interface SegmentBuilderModalProps {
   isOpen: boolean;
@@ -533,7 +531,7 @@ export default function SegmentBuilderModal({ isOpen, onClose, onSuccess }: Segm
               disabled={evaluating || rootGroup.rules.length === 0}
               className="px-6 py-2.5 rounded-xl bg-white/5 font-bold text-white hover:bg-white/10 transition-colors flex items-center gap-2"
             >
-              {evaluating ? <Loader2 className="animate-spin" size={18}/> : <UsersIcon size={18} />}
+              {evaluating ? <Loader2 className="animate-spin" size={18}/> : <Users size={18} />}
               Calcular Público
             </button>
           ) : <div />}
