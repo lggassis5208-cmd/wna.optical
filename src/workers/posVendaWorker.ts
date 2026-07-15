@@ -53,6 +53,117 @@ const sendWahaMessage = async (chatId: string, text: string) => {
   return response.json();
 };
 
+async function notificarAlertaWaha(tenantId: string, sessao: string, estado: string, detalhe: string) {
+  const TELEGRAM_TOKEN = process.env.ALERT_TELEGRAM_TOKEN;
+  const TELEGRAM_CHAT_ID = process.env.ALERT_TELEGRAM_CHAT_ID;
+  const WEBHOOK_URL = process.env.ALERT_WEBHOOK_URL;
+  
+  const mensagem = `⚠️ [ALERTA ÓTICA LIS - WAHA OFFLINE]\nLoja/Tenant: ${tenantId}\nSessão: ${sessao}\nStatus: 🔴 ${estado}\nDetalhe: ${detalhe}\nHorário: ${new Date().toLocaleString('pt-BR')}`;
+
+  if (TELEGRAM_TOKEN && TELEGRAM_CHAT_ID) {
+    try {
+      await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: mensagem })
+      });
+    } catch (e: any) {
+      console.error('[Alerta WAHA] Erro ao notificar Telegram:', e.message);
+    }
+  }
+
+  if (WEBHOOK_URL) {
+    try {
+      await fetch(WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: mensagem, content: mensagem, tenant_id: tenantId, sessao, estado, detalhe })
+      });
+    } catch (e: any) {
+      console.error('[Alerta WAHA] Erro ao notificar Webhook:', e.message);
+    }
+  }
+}
+
+export async function runWahaHealthCheck(tenantId: string): Promise<{ estado: string; checado_em: string; detalhe: string }> {
+  let estado = 'desconhecido';
+  let detalhe = '';
+  const checado_em = new Date().toISOString();
+
+  try {
+    const headers: any = { 'Accept': 'application/json' };
+    if (WAHA_API_KEY) headers['X-Api-Key'] = WAHA_API_KEY;
+
+    const response = await fetch(`${WAHA_URL}/api/sessions/${WAHA_SESSION}`, {
+      method: 'GET',
+      headers
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      const wahaStatus = data.status || data?.name || 'WORKING';
+      if (['WORKING', 'SCAN_QR_CODE', 'STOPPED', 'FAILED'].includes(wahaStatus)) {
+        estado = wahaStatus;
+      } else if (wahaStatus === 'WORKING') {
+        estado = 'WORKING';
+      } else {
+        estado = 'WORKING';
+      }
+      detalhe = `Sessão ativa e respondendo na API (${response.status})`;
+      if (data.status && data.status !== 'WORKING') {
+        detalhe = `Sessão em estado não funcional: ${data.status}`;
+        estado = data.status;
+      }
+    } else {
+      estado = 'FAILED';
+      detalhe = `API WAHA respondeu com erro HTTP ${response.status}: ${await response.text()}`;
+    }
+  } catch (err: any) {
+    estado = 'FAILED';
+    detalhe = `Erro de conexão ao endpoint WAHA (${WAHA_URL}): ${err.message}`;
+  }
+
+  const { data: statusAnterior } = await supabase
+    .from('waha_status')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .eq('sessao', WAHA_SESSION)
+    .single();
+
+  const payloadUpdate: any = {
+    tenant_id: tenantId,
+    sessao: WAHA_SESSION,
+    estado,
+    checado_em,
+    detalhe
+  };
+
+  if (estado !== 'WORKING') {
+    const ultimoAlerta = statusAnterior?.ultimo_alerta_em ? new Date(statusAnterior.ultimo_alerta_em).getTime() : 0;
+    const agora = Date.now();
+    const umaHoraMs = 60 * 60 * 1000;
+
+    if (!ultimoAlerta || (agora - ultimoAlerta) > umaHoraMs) {
+      console.warn(`[WAHA Health Check] Sessão '${WAHA_SESSION}' do tenant ${tenantId} em estado '${estado}'. Disparando alerta administrativo...`);
+      await notificarAlertaWaha(tenantId, WAHA_SESSION, estado, detalhe);
+      payloadUpdate.ultimo_alerta_em = new Date().toISOString();
+    } else {
+      if (statusAnterior?.ultimo_alerta_em) payloadUpdate.ultimo_alerta_em = statusAnterior.ultimo_alerta_em;
+      console.log(`[WAHA Health Check] Alerta para tenant ${tenantId} em cooldown (Último em ${new Date(ultimoAlerta).toLocaleString()}).`);
+    }
+  } else {
+    payloadUpdate.ultimo_alerta_em = null;
+  }
+
+  if (statusAnterior?.id) {
+    await supabase.from('waha_status').update(payloadUpdate).eq('id', statusAnterior.id);
+  } else {
+    await supabase.from('waha_status').insert([payloadUpdate]);
+  }
+
+  return { estado, checado_em, detalhe };
+}
+
 const checkBusinessHours = (config: any) => {
   const now = new Date();
   const hours = now.getHours();
@@ -197,6 +308,7 @@ async function processarCampanhaDisparosQueue(config: any, slots: number) {
         campanha_id,
         cliente_id,
         tenant_id,
+        tentativas,
         campanhas (
           nome,
           template_mensagem,
@@ -310,10 +422,29 @@ async function processarCampanhaDisparosQueue(config: any, slots: number) {
 
       } catch (err: any) {
         console.error(`❌ Falha no disparo de campanha para ${formattedPhone}:`, err.message);
-        await supabase.from('campanha_disparos').update({
-          status: 'falha',
-          erro_log: err.message
-        }).eq('id', disparo.id);
+        
+        const isTransitoria = err.message.includes('500') || err.message.includes('502') || err.message.includes('503') || err.message.includes('504') || err.message.includes('fetch failed') || err.message.includes('ECONNREFUSED') || err.message.includes('timeout');
+        const tentativasAtuais = (disparo.tentativas || 0) + 1;
+
+        if (isTransitoria && tentativasAtuais < 5) {
+          const delaySegundos = Math.pow(2, tentativasAtuais) * 60;
+          const novaData = new Date(Date.now() + delaySegundos * 1000).toISOString();
+          
+          console.log(`[Retry Campanha] Falha transitória (${err.message}). Reagendando para daqui a ${delaySegundos}s (Tentativa ${tentativasAtuais}/5)...`);
+          
+          await supabase.from('campanha_disparos').update({
+            status: 'pendente',
+            tentativas: tentativasAtuais,
+            data_agendamento: novaData,
+            erro_log: `Falha transitória (Tentativa ${tentativasAtuais}/5): ${err.message}`
+          }).eq('id', disparo.id);
+        } else {
+          await supabase.from('campanha_disparos').update({
+            status: 'falha',
+            tentativas: tentativasAtuais,
+            erro_log: isTransitoria ? `Falha definitiva após 5 tentativas: ${err.message}` : err.message
+          }).eq('id', disparo.id);
+        }
       }
 
       // Delay anti-ban entre disparos de campanhas
@@ -366,6 +497,13 @@ export async function processPosVendaQueue() {
     }
 
     for (const config of configs) {
+      // 1.5. Health check ativo da sessão WAHA desta loja
+      const statusWaha = await runWahaHealthCheck(config.tenant_id);
+      if (statusWaha.estado !== 'WORKING') {
+        console.warn(`[Pós-Venda] Loja ${config.tenant_id} com sessão WAHA em estado '${statusWaha.estado}' (${statusWaha.detalhe}). Abortando fila para manter mensagens pendentes.`);
+        continue;
+      }
+
       // 2. Verificar horário comercial da loja
       if (!checkBusinessHours(config)) {
         console.log(`[Pós-Venda] Loja ${config.tenant_id} fora do horário comercial. Ignorando.`);
@@ -409,6 +547,7 @@ export async function processPosVendaQueue() {
           cliente_id,
           tenant_id,
           tipo_gatilho,
+          tentativas,
           clientes (
             id,
             nome_completo,
@@ -574,10 +713,29 @@ export async function processPosVendaQueue() {
 
           } catch (err: any) {
             console.error(`❌ Falha ao enviar pós-venda para ${formattedPhone}:`, err.message);
-            await supabase.from('pos_venda_envios').update({
-              status: 'falha',
-              erro_log: err.message
-            }).eq('id', envio.id);
+            
+            const isTransitoria = err.message.includes('500') || err.message.includes('502') || err.message.includes('503') || err.message.includes('504') || err.message.includes('fetch failed') || err.message.includes('ECONNREFUSED') || err.message.includes('timeout');
+            const tentativasAtuais = (envio.tentativas || 0) + 1;
+
+            if (isTransitoria && tentativasAtuais < 5) {
+              const delaySegundos = Math.pow(2, tentativasAtuais) * 60;
+              const novaData = new Date(Date.now() + delaySegundos * 1000).toISOString();
+              
+              console.log(`[Retry Pós-Venda] Falha transitória (${err.message}). Reagendando para daqui a ${delaySegundos}s (Tentativa ${tentativasAtuais}/5)...`);
+              
+              await supabase.from('pos_venda_envios').update({
+                status: 'pendente',
+                tentativas: tentativasAtuais,
+                agendado_para: novaData,
+                erro_log: `Falha transitória (Tentativa ${tentativasAtuais}/5): ${err.message}`
+              }).eq('id', envio.id);
+            } else {
+              await supabase.from('pos_venda_envios').update({
+                status: 'falha',
+                tentativas: tentativasAtuais,
+                erro_log: isTransitoria ? `Falha definitiva após 5 tentativas: ${err.message}` : err.message
+              }).eq('id', envio.id);
+            }
           }
 
           // Delay anti-ban

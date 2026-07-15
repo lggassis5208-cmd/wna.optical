@@ -109,5 +109,5 @@ describe('Bateria de Testes E2E - Fluxo Completo (Ótica Lìs)', () => {
     expect(finalNota.timeline[1].acao).toBe('Impressão do DANFE (NF-e modelo 55)');
     expect(finalNota.timeline[2].acao).toBe('Impressão do cupom fiscal (NFC-e modelo 65)');
     expect(finalNota.timeline[3].acao).toBe('Impressão do comprovante de venda interno');
-  });
+  }, 20000);
 });

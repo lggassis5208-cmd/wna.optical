@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react';
 import { Filter, Plus, Trash2, Users, Search, Activity, Megaphone } from 'lucide-react';
 import { toast } from 'sonner';
 import { segmentosService, type Segmento } from '../lib/services/segmentosService';
+import { wahaStatusService, type WahaStatus } from '../lib/services/wahaStatusService';
 import SegmentBuilderModal from '../components/SegmentBuilderModal';
 import { formatDate } from '../lib/dateUtils';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 
 export default function SegmentosPage() {
   const [segmentos, setSegmentos] = useState<Segmento[]>([]);
+  const [wahaStatus, setWahaStatus] = useState<WahaStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -42,8 +44,20 @@ export default function SegmentosPage() {
     }
   };
 
+  const loadWahaStatus = async () => {
+    const status = await wahaStatusService.getLatestStatus();
+    setWahaStatus(status);
+  };
+
   useEffect(() => {
     loadSegmentos();
+    loadWahaStatus();
+
+    const interval = setInterval(() => {
+      loadWahaStatus();
+    }, 30000); // Poll de status a cada 30s
+
+    return () => clearInterval(interval);
   }, []);
 
   const handleDelete = async (id: string, e: React.MouseEvent) => {
@@ -63,17 +77,45 @@ export default function SegmentosPage() {
     s.nome.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Cálculo do status dinâmico da Engine WAHA
+  let engineStatusText = "Online (SQL Engine)";
+  let engineStatusClass = "text-green-500";
+  let engineStatusSub = "Consultas SQL em tempo real ativas";
+
+  if (wahaStatus) {
+    const diffMin = Math.round((Date.now() - new Date(wahaStatus.checado_em).getTime()) / (1000 * 60));
+    const isStale = diffMin > 15;
+
+    if (wahaStatus.estado === 'WORKING' && !isStale) {
+      engineStatusText = "Online (WORKING)";
+      engineStatusClass = "text-green-500";
+      engineStatusSub = `WAHA conectado há ${diffMin} min (${wahaStatus.sessao})`;
+    } else if (wahaStatus.estado === 'WORKING' && isStale) {
+      engineStatusText = "Stale (Sem resposta)";
+      engineStatusClass = "text-yellow-500";
+      engineStatusSub = `Última checagem há ${diffMin} min (> 15m)`;
+    } else {
+      engineStatusText = `Desconectado (${wahaStatus.estado})`;
+      engineStatusClass = "text-red-500";
+      engineStatusSub = `${wahaStatus.detalhe || 'Sessão indisponível'}. Checado há ${diffMin} min`;
+    }
+  } else {
+    engineStatusText = "Aguardando Health Check";
+    engineStatusClass = "text-yellow-500";
+    engineStatusSub = "Nenhum status recente gravado pelo Worker";
+  }
+
   return (
     <ErrorBoundary fallbackMessage="Erro ao renderizar a página de Segmentos.">
-      <div className="p-6 md:p-8 space-y-8 animate-in fade-in duration-500">
+      <div className="p-6 md:p-8 space-y-6 animate-in fade-in duration-500">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-black text-white tracking-tight flex items-center gap-3">
-            <Filter className="text-primary" size={32} />
-            Motor de Segmentação
+          <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+            <Filter className="text-primary" size={26} />
+            Motor de Segmentação (CRM)
           </h1>
-          <p className="text-white/40 mt-1">
-            Crie listas dinâmicas de clientes para campanhas e automações.
+          <p className="text-white/60 text-sm mt-1">
+            Crie públicos dinâmicos com filtros combinados sobre a base única de pacientes
           </p>
         </div>
         <button 
@@ -109,9 +151,9 @@ export default function SegmentosPage() {
         <MetricCard 
           icon={<Activity />}
           title="Engine Status"
-          value="Online"
-          valueClass="text-green-500"
-          subtitle="Consultas SQL em tempo real ativas"
+          value={engineStatusText}
+          valueClass={engineStatusClass}
+          subtitle={engineStatusSub}
         />
       </div>
 
