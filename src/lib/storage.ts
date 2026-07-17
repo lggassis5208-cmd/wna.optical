@@ -1,11 +1,6 @@
-import { supabase } from './supabase';
+import { supabase, isSupabaseConfigured } from './supabase';
 import { toast } from 'sonner';
-
-// Utility to check if Supabase is actually configured
-const isSupabaseConfigured = () => {
-  return import.meta.env.VITE_SUPABASE_URL && 
-         import.meta.env.VITE_SUPABASE_URL !== 'https://placeholder.supabase.co';
-};
+import { agendaService } from './services/agendaService';
 
 // Auxiliar para pegar o endereço correto baseado na data
 export const getEffectiveAddress = (dateStr?: string) => {
@@ -117,108 +112,17 @@ export const storage = {
     return clients.find((c: any) => c.id === id) || null;
   },
 
-  // --- AGENDA / AGENDAMENTOS ---
+  // --- AGENDA / AGENDAMENTOS (FONTE ÚNICA: SUPABASE VIA AGENDASERVICE) ---
   async saveExame(exame: any) {
-    if (isSupabaseConfigured()) {
-      try {
-        const row = {
-          cliente_id: exame.cliente_id,
-          data: exame.data,
-          horario: exame.horario,
-          status: exame.status || 'AGENDADO',
-          observacao: exame.observacao || null
-        };
-        const { data, error } = await supabase.from('agendamentos').insert([row]).select(`
-          *,
-          clientes (id, nome_completo, cpf, whatsapp)
-        `);
-        if (!error && data) {
-          // Retornar no formato esperado pelo frontend
-          const ag = data[0];
-          return {
-            ...ag,
-            paciente_nome: ag.clientes?.nome_completo || '',
-            paciente_cpf: ag.clientes?.cpf || '',
-            paciente_whatsapp: ag.clientes?.whatsapp || ''
-          };
-        }
-        console.warn('Supabase agendamento insert error', error);
-      } catch (e) {
-        console.warn('Supabase error, falling back to LocalStorage', e);
-      }
-    }
-    // LocalStorage Fallback
-    const exames = JSON.parse(localStorage.getItem('lis_exames') || '[]');
-    const newExame = { 
-      ...exame, 
-      id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9), 
-      criado_em: new Date().toISOString() 
-    };
-    exames.push(newExame);
-    localStorage.setItem('lis_exames', JSON.stringify(exames));
-    return newExame;
+    return await agendaService.salvarAgendamento(exame);
   },
 
-  async getExames() {
-    if (isSupabaseConfigured()) {
-      try {
-        let { data, error } = await supabase.from('agendamentos').select(`
-          *,
-          clientes (id, nome_completo, cpf, whatsapp)
-        `).order('data', { ascending: true });
-        
-        if (error && (error.code === '42703' || error.message.includes('data'))) {
-          console.warn('data não existe no agendamentos, tentando data_agendamento...');
-          const retry = await supabase.from('agendamentos').select(`
-            *,
-            clientes (id, nome_completo, cpf, whatsapp)
-          `).order('data_agendamento', { ascending: true });
-          data = retry.data;
-          error = retry.error;
-        }
-
-        if (error) {
-          console.error('Supabase agendamentos select error', error);
-          toast.error('Falha de sincronização com o banco de dados dos agendamentos.');
-          throw error;
-        }
-        if (data) {
-          return data.map((ag: any) => ({
-            ...ag,
-            paciente_nome: ag.clientes?.nome_completo || '',
-            paciente_cpf: ag.clientes?.cpf || '',
-            paciente_whatsapp: ag.clientes?.whatsapp || ''
-          }));
-        }
-      } catch (e) {
-        console.error('Falha crítica na conexão com o Supabase para agendamentos:', e);
-        toast.error('Erro de conexão com o banco de dados. Exibindo agendamentos locais offline.');
-      }
-    }
-    return JSON.parse(localStorage.getItem('lis_exames') || '[]');
+  async getExames(inicioIso?: string, fimIso?: string) {
+    return await agendaService.buscarAgendamentos(inicioIso, fimIso);
   },
 
-  async updateExameStatus(id: string, status: string) {
-    if (isSupabaseConfigured()) {
-      try {
-        const { data, error } = await supabase
-          .from('agendamentos')
-          .update({ status })
-          .eq('id', id)
-          .select();
-        if (!error && data) return data[0];
-      } catch (e) {
-        console.warn('Supabase updateExameStatus error', e);
-      }
-    }
-    const exames = await this.getExames();
-    const index = exames.findIndex((e: any) => e.id === id);
-    if (index !== -1) {
-      exames[index].status = status;
-      localStorage.setItem('lis_exames', JSON.stringify(exames));
-      return exames[index];
-    }
-    return null;
+  async updateExameStatus(id: string, status: string, observacoes?: string) {
+    return await agendaService.atualizarStatus(id, status, observacoes);
   },
   // --- VENDAS ---
   async saveSale(sale: any) {
