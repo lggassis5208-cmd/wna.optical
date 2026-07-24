@@ -18,6 +18,7 @@ import { movimentosService } from '../lib/services/movimentosService';
 import { toast } from 'sonner';
 import { openWhatsApp } from '../lib/whatsappUtils';
 import HistoricoCaixasModal from '../components/HistoricoCaixasModal';
+import RelatorioCaixaModal from '../components/RelatorioCaixaModal';
 import { categoriasService, type Categoria } from '../lib/services/categoriasService';
 import { Plus } from 'lucide-react';
 
@@ -31,6 +32,7 @@ export default function CaixaPage() {
   const [saidaModal, setSaidaModal] = useState(false);
   const [entradaModal, setEntradaModal] = useState(false);
   const [historicoModal, setHistoricoModal] = useState(false);
+  const [relatorioModal, setRelatorioModal] = useState(false);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [novaSaida, setNovaSaida] = useState({ descricao: '', valor: '', forma: 'Dinheiro', categoria_id: '' });
   const [novaEntrada, setNovaEntrada] = useState({ descricao: '', valor: '', forma: 'Dinheiro', categoria_id: '' });
@@ -228,7 +230,10 @@ export default function CaixaPage() {
               <Calendar size={18} />
               Histórico
             </button>
-            <button className="bg-white/5 border border-white/10 text-white font-bold px-4 py-3 rounded-2xl flex items-center gap-2 hover:bg-white/10 transition-all text-sm">
+            <button
+              onClick={() => setRelatorioModal(true)}
+              className="bg-white/5 border border-white/10 text-white font-bold px-4 py-3 rounded-2xl flex items-center gap-2 hover:bg-white/10 transition-all text-sm"
+            >
               <Printer size={18} />
               Gerar Relatório
             </button>
@@ -625,6 +630,12 @@ export default function CaixaPage() {
       )}
 
       <HistoricoCaixasModal isOpen={historicoModal} onClose={() => setHistoricoModal(false)} />
+      <RelatorioCaixaModal
+        isOpen={relatorioModal}
+        onClose={() => setRelatorioModal(false)}
+        caixa={caixaAtivo}
+        movimentosInicial={movimentos}
+      />
     </div>
   );
 }

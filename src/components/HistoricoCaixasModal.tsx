@@ -4,6 +4,7 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isTod
 import { ptBR } from 'date-fns/locale';
 import { caixaService, type Caixa } from '../lib/services/caixaService';
 import { toast } from 'sonner';
+import RelatorioCaixaModal from './RelatorioCaixaModal';
 
 interface HistoricoCaixasModalProps {
   isOpen: boolean;
@@ -14,6 +15,7 @@ export default function HistoricoCaixasModal({ isOpen, onClose }: HistoricoCaixa
   const [caixas, setCaixas] = useState<Caixa[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [caixaSelecionado, setCaixaSelecionado] = useState<Caixa | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -99,6 +101,11 @@ export default function HistoricoCaixasModal({ isOpen, onClose }: HistoricoCaixa
               return (
                 <div 
                   key={date.toISOString()} 
+                  onClick={() => {
+                    if (hasCaixas && caixasDoDia[0]) {
+                      setCaixaSelecionado(caixasDoDia[0]);
+                    }
+                  }}
                   className={`
                     relative rounded-2xl p-3 border aspect-square flex flex-col hover:border-primary/50 transition-colors cursor-pointer group
                     ${isTodayDate ? 'border-primary bg-primary/5' : 'border-white/5 bg-white/[0.02]'}
@@ -139,6 +146,12 @@ export default function HistoricoCaixasModal({ isOpen, onClose }: HistoricoCaixa
 
         </div>
       </div>
+
+      <RelatorioCaixaModal
+        isOpen={Boolean(caixaSelecionado)}
+        onClose={() => setCaixaSelecionado(null)}
+        caixa={caixaSelecionado}
+      />
     </div>
   );
 }

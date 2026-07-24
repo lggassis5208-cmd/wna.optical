@@ -72,11 +72,11 @@ export const storage = {
   async getClients() {
     if (isSupabaseConfigured()) {
       try {
-        let { data, error } = await supabase.from('clientes').select('*').order('created_at', { ascending: false });
+        let { data, error } = await supabase.from('clientes').select('*').order('criado_em', { ascending: false });
         
-        if (error && (error.code === '42703' || error.message.includes('created_at'))) {
-          console.warn('created_at não existe no clientes, tentando criado_em...');
-          const retry = await supabase.from('clientes').select('*').order('criado_em', { ascending: false });
+        if (error && (error.code === '42703' || error.message?.includes('criado_em'))) {
+          console.warn('criado_em não existe no clientes, tentando created_at...');
+          const retry = await supabase.from('clientes').select('*').order('created_at', { ascending: false });
           data = retry.data;
           error = retry.error;
         }

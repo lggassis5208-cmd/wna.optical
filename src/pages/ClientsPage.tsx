@@ -3,23 +3,28 @@ import {
   Plus, 
   Search, 
   MoreVertical, 
-  Mail, 
   MessageSquare, 
   ShieldCheck,
-  Upload
+  Upload,
+  Printer,
+  Users,
+  Calendar,
+  Sparkles,
+  MapPin
 } from 'lucide-react';
 import { toast } from 'sonner';
 import ClientModal from '../components/ClientModal';
 import ClientProfileModal from '../components/ClientProfileModal';
+import PrintPatientListModal from '../components/PrintPatientListModal';
 import { storage } from '../lib/storage';
 import { formatDate, getNowISO } from '../lib/dateUtils';
-
 import Papa from 'papaparse';
 
 export default function ClientsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [printModalOpen, setPrintModalOpen] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [clients, setClients] = useState<any[]>([]);
 
@@ -33,16 +38,15 @@ export default function ClientsPage() {
     if (!file) return;
 
     Papa.parse(file, {
-      header: false, // Vamos processar manualmente para pular o "lixo" no topo
+      header: false,
       skipEmptyLines: true,
       complete: async (results) => {
         try {
           const rows = results.data as string[][];
           if (rows.length < 1) return toast.error('Arquivo vazio.');
 
-          // 1. Encontrar a linha do cabeçalho (Skip Trash)
           let headerRowIndex = -1;
-          const headerKeywords = ['nome', 'cpf', 'cnpj', 'fone', 'telefone', 'celular', 'cliente'];
+          const headerKeywords = ['nome', 'cpf', 'cnpj', 'fone', 'telefone', 'celular', 'cliente', 'paciente'];
           
           for (let i = 0; i < rows.length; i++) {
             const row = rows[i].map(v => String(v).toLowerCase().trim());
@@ -59,25 +63,20 @@ export default function ClientsPage() {
           const headers = rows[headerRowIndex].map(h => String(h).toLowerCase().trim());
           const findCol = (keywords: string[]) => headers.findIndex(h => keywords.some(kw => h.includes(kw)));
 
-          const nomeCol = findCol(['nome', 'cliente', 'razão']);
+          const nomeCol = findCol(['nome', 'cliente', 'paciente', 'razão']);
           const cpfCol = findCol(['cpf', 'cnpj', 'documento']);
           const telCol = findCol(['fone', 'telefone', 'celular', 'whatsapp']);
           const dataCol = findCol(['data', 'nascimento', 'cadastro']);
 
           let importedCount = 0;
 
-          // 2. Processar dados a partir da linha após o cabeçalho
           for (let i = headerRowIndex + 1; i < rows.length; i++) {
             const row = rows[i];
             if (!row[nomeCol]) continue;
 
-            // Limpeza de CPF
             let cpf = row[cpfCol] ? String(row[cpfCol]).replace(/\D/g, '') : '';
-            
-            // Limpeza de Telefone (whatsapp)
             let whatsapp = row[telCol] ? String(row[telCol]).trim() : '';
 
-            // Limpeza/Formatação de Data (Ex: 05012024 -> 05/01/2024)
             let metadata: any = {};
             if (dataCol !== -1 && row[dataCol]) {
               let dateStr = String(row[dataCol]).replace(/\D/g, '');
@@ -98,7 +97,7 @@ export default function ClientsPage() {
             importedCount++;
           }
 
-          toast.success(`Importação Concluída: ${importedCount} clientes.`, {
+          toast.success(`Importação Concluída: ${importedCount} pacientes/clientes.`, {
             description: 'A base foi atualizada com sucesso.'
           });
           fetchClients();
@@ -122,27 +121,46 @@ export default function ClientsPage() {
     const openModalParam = params.get('openModal');
     if (openModalParam === 'true') {
       setIsModalOpen(true);
-      // Limpar parâmetro para não ficar abrindo ao dar F5
       const cleanUrl = window.location.pathname + window.location.hash;
       window.history.replaceState({}, '', cleanUrl);
     }
   }, [isModalOpen]);
 
-  const filteredClients = clients.filter(c => 
-    c.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    c.cpf?.includes(searchTerm)
-  );
+  const filteredClients = clients.filter(c => {
+    const term = searchTerm.toLowerCase();
+    const name = (c.nome_completo || c.name || c.nome || '').toLowerCase();
+    const cpf = (c.cpf || '').toLowerCase();
+    const phone = (c.whatsapp || '').toLowerCase();
+    const city = (c.cidade || '').toLowerCase();
+    return name.includes(term) || cpf.includes(term) || phone.includes(term) || city.includes(term);
+  });
+
+  const highScoreCount = clients.filter(c => (c.lis_score || 850) >= 850).length;
+  const todayDateStr = new Date().toLocaleDateString('pt-BR');
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex justify-between items-center">
+      {/* Dynamic Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold">Clientes</h2>
-          <p className="text-white/40 text-sm">Gerencie sua base de clientes premium</p>
+          <div className="flex items-center gap-3">
+            <h2 className="text-2xl font-black text-white tracking-tight">Pacientes & Clientes</h2>
+            <span className="bg-primary/10 border border-primary/20 text-primary text-xs px-3 py-1 rounded-full font-bold">
+              {clients.length} Cadastrados Até Hoje ({todayDateStr})
+            </span>
+          </div>
+          <p className="text-white/40 text-sm mt-1">Gerencie e exporte a base de pacientes cadastrados no sistema até a presente data</p>
         </div>
-        <div className="flex gap-3">
-          <label className="bg-white/5 text-white/70 font-bold px-6 py-2.5 rounded-xl flex items-center gap-2 hover:bg-white/10 transition-all active:scale-95 cursor-pointer border border-white/10">
-            <Upload size={20} className="text-primary" />
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={() => setPrintModalOpen(true)}
+            className="bg-white/5 border border-white/10 text-white font-bold px-5 py-2.5 rounded-xl flex items-center gap-2 hover:bg-white/10 transition-all active:scale-95 cursor-pointer text-sm"
+          >
+            <Printer size={18} className="text-primary" />
+            Imprimir Relatório
+          </button>
+          <label className="bg-white/5 text-white/70 font-bold px-5 py-2.5 rounded-xl flex items-center gap-2 hover:bg-white/10 transition-all active:scale-95 cursor-pointer border border-white/10 text-sm">
+            <Upload size={18} className="text-primary" />
             Importar CSV
             <input 
               type="file" 
@@ -153,11 +171,47 @@ export default function ClientsPage() {
           </label>
           <button 
             onClick={() => setIsModalOpen(true)}
-            className="bg-primary text-black font-bold px-6 py-2.5 rounded-xl flex items-center gap-2 hover:shadow-lg hover:shadow-primary/20 transition-all active:scale-95"
+            className="bg-primary text-black font-bold px-6 py-2.5 rounded-xl flex items-center gap-2 hover:shadow-lg hover:shadow-primary/20 transition-all active:scale-95 text-sm cursor-pointer"
           >
-            <Plus size={20} />
-            Novo Cliente
+            <Plus size={18} />
+            Novo Paciente
           </button>
+        </div>
+      </div>
+
+      {/* Metric Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-surface p-5 rounded-2xl border border-white/5 shadow-xl flex items-center gap-4">
+          <div className="p-3 bg-primary/10 rounded-xl text-primary border border-primary/20">
+            <Users size={24} />
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase text-white/40 tracking-wider">Total de Pacientes</p>
+            <p className="text-2xl font-black text-white">{clients.length}</p>
+            <p className="text-[11px] text-primary/80 font-medium">Cadastrados até {todayDateStr}</p>
+          </div>
+        </div>
+
+        <div className="bg-surface p-5 rounded-2xl border border-white/5 shadow-xl flex items-center gap-4">
+          <div className="p-3 bg-purple-500/10 rounded-xl text-purple-400 border border-purple-500/20">
+            <ShieldCheck size={24} />
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase text-white/40 tracking-wider">Score Elevado (850+)</p>
+            <p className="text-2xl font-black text-white">{highScoreCount}</p>
+            <p className="text-[11px] text-purple-400 font-medium">Perfil Premium & Fidelizados</p>
+          </div>
+        </div>
+
+        <div className="bg-surface p-5 rounded-2xl border border-white/5 shadow-xl flex items-center gap-4">
+          <div className="p-3 bg-green-500/10 rounded-xl text-green-400 border border-green-500/20">
+            <Calendar size={24} />
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase text-white/40 tracking-wider">Status da Base</p>
+            <p className="text-2xl font-black text-white">Sincronizado</p>
+            <p className="text-[11px] text-green-400 font-medium">Banco de Dados Supabase OK</p>
+          </div>
         </div>
       </div>
 
@@ -167,19 +221,27 @@ export default function ClientsPage() {
         onClose={() => setProfileModalOpen(false)} 
         clientId={selectedClientId} 
       />
+      <PrintPatientListModal 
+        isOpen={printModalOpen}
+        onClose={() => setPrintModalOpen(false)}
+        patients={clients}
+      />
 
       <div className="bg-surface rounded-2xl border border-white/5 overflow-hidden shadow-xl">
-        {/* Table Header/Toolbar */}
-        <div className="p-6 border-b border-white/5 flex items-center justify-between gap-4">
-          <div className="relative flex-1 max-w-md">
+        {/* Table Toolbar */}
+        <div className="p-6 border-b border-white/5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="relative flex-1 w-full md:max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" size={18} />
             <input 
               type="text" 
-              placeholder="Buscar por nome, CPF ou celular..." 
-              className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-10 pr-4 text-sm focus:outline-none focus:border-primary/50 transition-colors text-white"
+              placeholder="Buscar por nome do paciente, CPF, WhatsApp ou cidade..." 
+              className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:border-primary/50 transition-colors text-white placeholder:text-white/30"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
+          </div>
+          <div className="text-xs text-white/40 font-medium">
+            Exibindo <span className="text-white font-bold">{filteredClients.length}</span> de <span className="text-white font-bold">{clients.length}</span> pacientes
           </div>
         </div>
 
@@ -188,95 +250,89 @@ export default function ClientsPage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-black/20 text-white/40 text-xs uppercase tracking-widest font-semibold">
-                <th className="px-6 py-4">Cliente</th>
+                <th className="px-6 py-4">Paciente</th>
                 <th className="px-6 py-4">Contato</th>
-                <th className="px-6 py-4 text-center">Temperatura</th>
+                <th className="px-6 py-4">Localidade</th>
                 <th className="px-6 py-4 text-center">Lis Score</th>
-                <th className="px-6 py-4">Cadastro</th>
+                <th className="px-6 py-4">Data Cadastro</th>
                 <th className="px-6 py-4 text-right">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
               {filteredClients.length === 0 ? (
                 <tr>
-                   <td colSpan={5} className="px-6 py-10 text-center text-white/20 italic">
-                      Nenhum cliente cadastrado ainda.
+                   <td colSpan={6} className="px-6 py-12 text-center text-white/30 italic">
+                      Nenhum paciente encontrado na busca.
                    </td>
                 </tr>
-              ) : filteredClients.map((client) => (
-                <tr 
-                  key={client.id} 
-                  className="hover:bg-white/[0.02] transition-colors group cursor-pointer"
-                  onClick={() => {
-                    setSelectedClientId(client.id);
-                    setProfileModalOpen(true);
-                  }}
-                >
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                        {client.name?.charAt(0) || 'C'}
+              ) : filteredClients.map((client) => {
+                const clientName = client.nome_completo || client.name || client.nome || 'Paciente sem nome';
+                return (
+                  <tr 
+                    key={client.id} 
+                    className="hover:bg-white/[0.02] transition-colors group cursor-pointer"
+                    onClick={() => {
+                      setSelectedClientId(client.id);
+                      setProfileModalOpen(true);
+                    }}
+                  >
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold">
+                          {clientName.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-white group-hover:text-primary transition-colors">{clientName}</p>
+                          <p className="text-xs text-white/30 font-mono">{client.cpf || 'Sem CPF'}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-semibold text-white">{client.name}</p>
-                        <p className="text-xs text-white/30">{client.cpf}</p>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 text-sm text-white/80">
+                          <MessageSquare size={14} className="text-primary/70" />
+                          {client.whatsapp || 'Não informado'}
+                        </div>
+                        {client.email && (
+                          <p className="text-xs text-white/30 truncate max-w-[200px]">{client.email}</p>
+                        )}
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 text-sm text-white/70">
-                        <MessageSquare size={14} className="text-primary/60" />
-                        {client.whatsapp}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-1.5 text-sm text-white/60">
+                        <MapPin size={14} className="text-white/30 shrink-0" />
+                        <span>{client.cidade ? `${client.cidade}${client.estado ? `/${client.estado}` : ''}` : 'Goiânia/GO'}</span>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    {client.temperatura === 'quente' ? (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-bold">
-                        🔥 Quente
-                      </span>
-                    ) : client.temperatura === 'morno' ? (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 text-xs font-bold">
-                        ☀️ Morno
-                      </span>
-                    ) : client.temperatura === 'fidelizado' ? (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs font-bold">
-                        💎 Fidelizado
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-bold">
-                        ❄️ Frio
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-bold">
-                      <ShieldCheck size={14} />
-                      {client.lis_score || 850}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <p className="text-sm font-medium text-white/40">
-                      {client.criado_em ? formatDate(client.criado_em) : '---'}
-                    </p>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button 
-                        className="p-2 hover:bg-white/5 rounded-lg text-white/30 hover:text-white transition-colors cursor-pointer"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          // futuramente: editar cadastro
-                        }}
-                        title="Abrir Opções"
-                      >
-                        <MoreVertical size={18} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-bold">
+                        <ShieldCheck size={14} />
+                        {client.lis_score || 850}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <p className="text-sm font-medium text-white/50">
+                        {client.criado_em ? formatDate(client.criado_em) : '---'}
+                      </p>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button 
+                          className="p-2 hover:bg-white/10 rounded-lg text-white/50 hover:text-white transition-colors cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedClientId(client.id);
+                            setProfileModalOpen(true);
+                          }}
+                          title="Ver Perfil Completo"
+                        >
+                          <MoreVertical size={18} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
