@@ -31,7 +31,7 @@ import {
 import { storage } from '../lib/storage';
 import { formatDate } from '../lib/dateUtils';
 import { useNavigate } from 'react-router-dom';
-import { montarLinkWhatsApp } from '../components/WhatsAppComprovante';
+import { openWhatsApp } from '../lib/whatsappUtils';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -284,12 +284,7 @@ export default function DashboardPage() {
       toast.error('Número de Telefone não encontrado.');
       return;
     }
-    const link = montarLinkWhatsApp(phone, message);
-    if (link) {
-      window.open(link, '_blank');
-    } else {
-      toast.error('Telefone com formato inválido para o WhatsApp.');
-    }
+    openWhatsApp(phone, message);
   };
 
   return (

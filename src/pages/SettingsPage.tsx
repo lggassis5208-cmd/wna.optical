@@ -10,7 +10,8 @@ import {
   Save, 
   AlertTriangle,
   Image as ImageIcon,
-  CheckCircle2
+  CheckCircle2,
+  MessageSquare
 } from 'lucide-react';
 import { storage } from '../lib/storage';
 import { toast } from 'sonner';
@@ -268,6 +269,65 @@ export default function SettingsPage() {
                    >
                      <div className={`w-6 h-6 rounded-full bg-white transition-all shadow-md ${settings.sistema.trava_caixa ? 'translate-x-6' : 'translate-x-0'}`} />
                    </button>
+                </div>
+
+                <div className="space-y-4">
+                   <div className="flex items-center gap-2">
+                     <MessageSquare size={18} className="text-primary" />
+                     <h4 className="font-bold text-white">Modo de Abertura do WhatsApp</h4>
+                   </div>
+                   <div className="p-6 bg-white/[0.02] rounded-2xl border border-white/5 space-y-4">
+                      <p className="text-xs text-white/40 leading-relaxed">
+                        Escolha como o sistema deve direcionar os links de envio do WhatsApp:
+                      </p>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                         <button
+                           type="button"
+                           onClick={() => setSettings({...settings, sistema: {...settings.sistema, whatsapp_modo: 'api'}})}
+                           className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
+                             (settings.sistema?.whatsapp_modo || 'api') === 'api'
+                               ? 'bg-primary/10 border-primary text-white font-bold'
+                               : 'bg-white/5 border-white/10 text-white/50 hover:bg-white/10'
+                           }`}
+                         >
+                            <p className="text-sm font-bold">WhatsApp Universal (API)</p>
+                            <p className="text-[11px] text-white/40 font-normal mt-1">Padrão api.whatsapp.com (Redireciona para Web ou App)</p>
+                         </button>
+
+                         <button
+                           type="button"
+                           onClick={() => setSettings({...settings, sistema: {...settings.sistema, whatsapp_modo: 'web'}})}
+                           className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
+                             (settings.sistema?.whatsapp_modo || 'api') === 'web'
+                               ? 'bg-primary/10 border-primary text-white font-bold'
+                               : 'bg-white/5 border-white/10 text-white/50 hover:bg-white/10'
+                           }`}
+                         >
+                            <p className="text-sm font-bold">WhatsApp Web Direto</p>
+                            <p className="text-[11px] text-white/40 font-normal mt-1">Abre diretamente a aba web.whatsapp.com no navegador</p>
+                         </button>
+
+                         <button
+                           type="button"
+                           onClick={() => setSettings({...settings, sistema: {...settings.sistema, whatsapp_modo: 'app'}})}
+                           className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
+                             (settings.sistema?.whatsapp_modo || 'api') === 'app'
+                               ? 'bg-primary/10 border-primary text-white font-bold'
+                               : 'bg-white/5 border-white/10 text-white/50 hover:bg-white/10'
+                           }`}
+                         >
+                            <p className="text-sm font-bold">Aplicativo Desktop</p>
+                            <p className="text-[11px] text-white/40 font-normal mt-1">Dispara o aplicativo WhatsApp instalado no Windows</p>
+                         </button>
+                      </div>
+
+                      <div className="bg-primary/5 border border-primary/20 p-4 rounded-xl text-xs text-white/70 space-y-1">
+                         <p className="font-bold text-primary">💡 Dica para envio pelo WhatsApp da Ótica:</p>
+                         <p className="text-[11px] text-white/50 leading-relaxed">
+                           Para garantir que as conversas abram na conta da loja (e não na sua pessoal), abra o <strong>WhatsApp Web</strong> da Ótica Lis neste navegador ou utilize um perfil exclusivo do navegador (Chrome/Edge) para a Ótica Lis.
+                         </p>
+                      </div>
+                   </div>
                 </div>
 
                 <div className="space-y-4">

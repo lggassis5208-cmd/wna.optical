@@ -720,7 +720,8 @@ export const storage = {
       },
       sistema: {
         trava_caixa: true,
-        termos_garantia: 'Garantia de 1 ano para defeitos de fabricação.'
+        termos_garantia: 'Garantia de 1 ano para defeitos de fabricação.',
+        whatsapp_modo: 'api'
       },
       sicoob: {
         clientId: '',
@@ -745,6 +746,9 @@ export const storage = {
   },
 
   async saveSettings(settings: any) {
+    if (settings?.sistema?.whatsapp_modo) {
+      localStorage.setItem('lis_whatsapp_mode', settings.sistema.whatsapp_modo);
+    }
     localStorage.setItem('lis_settings', JSON.stringify(settings));
     return settings;
   }

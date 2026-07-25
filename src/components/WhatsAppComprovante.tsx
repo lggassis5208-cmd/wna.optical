@@ -1,26 +1,7 @@
-import React from 'react';
-import { MessageSquare } from 'lucide-react';
-import { createRoot } from 'react-dom/client';
-import ReciboInterno from './ReciboInterno';
+import { formatPhoneForWhatsApp, getWhatsAppLink } from '../lib/whatsappUtils';
 
 export function normalizarTelefoneBR(tel: string): string {
-  if (!tel) return '';
-  // Remove tudo que não for dígito
-  let cleaned = tel.replace(/\D/g, '');
-  if (cleaned.length === 0) return '';
-  
-  // Se já começar com 55 e tiver 12 ou 13 dígitos, está completo
-  if (cleaned.startsWith('55') && (cleaned.length === 12 || cleaned.length === 13)) {
-    return cleaned;
-  }
-  
-  // Se tiver 10 ou 11 dígitos, é DDD + Número, adiciona o 55
-  if (cleaned.length === 10 || cleaned.length === 11) {
-    return '55' + cleaned;
-  }
-  
-  // Rejeita números sem DDD (menos de 10 dígitos)
-  return '';
+  return formatPhoneForWhatsApp(tel);
 }
 
 export interface MensagemProps {
@@ -44,10 +25,7 @@ export function montarMensagemComprovante({
 }
 
 export function montarLinkWhatsApp(tel: string, msg: string): string {
-  const normalizedTel = normalizarTelefoneBR(tel);
-  if (!normalizedTel) return '';
-  const encodedMsg = encodeURIComponent(msg);
-  return `https://wa.me/${normalizedTel}?text=${encodedMsg}`;
+  return getWhatsAppLink(tel, msg);
 }
 
 export function baixarPdf(url: string, filename: string): void {
