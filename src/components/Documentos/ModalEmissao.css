@@ -1,0 +1,564 @@
+/* ====================================================
+   MODAL DE EMISSÃO E SUPORTE A MÚLTIPLOS FORMATOS DE IMPRESSÃO
+   (A4, A5 e Bobina Térmica 80mm/58mm)
+   ==================================================== */
+
+.modal-emissao-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(15, 23, 42, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modal-emissao {
+  background-color: #ffffff;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 860px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+}
+
+.modal-emissao__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.modal-emissao__titulo {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+}
+
+.modal-emissao__close-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #64748b;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+  display: inline-flex;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.modal-emissao__close-btn:hover {
+  background-color: #f1f5f9;
+  color: #0f172a;
+}
+
+.modal-emissao__alerta {
+  margin: 15px 24px 0 24px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.modal-emissao__alerta--erro {
+  background-color: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fee2e2;
+}
+
+.modal-emissao__alerta--sucesso {
+  background-color: #f0fdf4;
+  color: #166534;
+  border: 1px solid #dcfce7;
+}
+
+.modal-emissao__body {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.modal-emissao__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 15px;
+  padding: 16px 24px;
+  border-top: 1px solid #e2e8f0;
+  background-color: #f8fafc;
+}
+
+/* ────────────────────────────────────────────────────
+   PASSO 1: Seleção de Pacientes e Listagem
+   ──────────────────────────────────────────────────── */
+.emissao-step-1 {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.pacientes-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 8px;
+  background-color: #f8fafc;
+  margin-top: 8px;
+}
+
+.pacientes-lista__status {
+  padding: 12px;
+  text-align: center;
+  font-size: 15px;
+  color: #64748b;
+}
+
+.paciente-card-btn {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 12px 16px;
+  background-color: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+  min-height: 48px;
+}
+
+.paciente-card-btn:hover {
+  background-color: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.paciente-card-btn--ativo {
+  background-color: #f0fdff;
+  border-color: #00A8CC;
+  box-shadow: 0 0 0 1px #00A8CC;
+}
+
+.paciente-card-btn__nome {
+  font-size: 16px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.paciente-card-btn__cpf {
+  font-size: 14px;
+  color: #64748b;
+  font-family: monospace;
+}
+
+/* ────────────────────────────────────────────────────
+   SELETOR DE FORMATOS DE IMPRESSÃO (Azul Ciano & Branco)
+   ──────────────────────────────────────────────────── */
+.seletor-impressao-container {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+}
+
+.seletor-impressao__titulo {
+  font-size: 13px;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.seletor-impressao__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.formato-card-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background-color: #ffffff;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s ease-in-out;
+}
+
+.formato-card-btn:hover {
+  border-color: #00A8CC;
+  background-color: #f0fdff;
+}
+
+.formato-card-btn--ativo {
+  border-color: #00A8CC;
+  background-color: #00A8CC;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(0, 168, 204, 0.25);
+}
+
+.formato-card-btn__icon {
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #00A8CC;
+  transition: color 0.2s;
+}
+
+.formato-card-btn--ativo .formato-card-btn__icon {
+  color: #ffffff;
+}
+
+.formato-card-btn__info {
+  display: flex;
+  flex-direction: column;
+}
+
+.formato-card-btn__nome {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.formato-card-btn--ativo .formato-card-btn__nome {
+  color: #ffffff;
+}
+
+.formato-card-btn__desc {
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.formato-card-btn--ativo .formato-card-btn__desc {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* ────────────────────────────────────────────────────
+   ESTILIZAÇÃO DA CONFIRMAÇÃO E ESTRUTURA TIMBRADA
+   ──────────────────────────────────────────────────── */
+.emissao-concluida-tela {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.emissao-concluida-header {
+  text-align: center;
+  padding: 20px;
+  background-color: #f0fdf4;
+  border: 1px solid #dcfce7;
+  border-radius: 16px;
+}
+
+.emissao-sucesso-icon {
+  font-size: 40px;
+  color: #166534;
+  margin-bottom: 8px;
+}
+
+.emissao-concluida-acoes {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.folha-timbrada-modal {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 24px;
+  color: #0f172a;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+}
+
+.folha-timbrada__cabecalho {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid #00A8CC;
+  padding-bottom: 16px;
+  margin-bottom: 20px;
+}
+
+.folha-timbrada__clinica-dados {
+  text-align: right;
+  font-size: 13px;
+  color: #475569;
+}
+
+.folha-timbrada__conteudo {
+  min-height: 240px;
+}
+
+.folha-timbrada__corpo-renderizado {
+  font-family: Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.folha-timbrada__aviso-legal {
+  margin-top: 24px;
+  padding: 10px;
+  background-color: #f8fafc;
+  border-radius: 6px;
+  font-size: 11px;
+  color: #64748b;
+  text-align: center;
+}
+
+.folha-timbrada__rodape {
+  margin-top: 40px;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 16px;
+  text-align: center;
+  font-size: 13px;
+  color: #475569;
+}
+
+.folha-timbrada__assinatura-linha {
+  width: 220px;
+  height: 1px;
+  background-color: #0f172a;
+  margin: 0 auto 8px auto;
+}
+
+.folha-timbrada__autenticidade {
+  margin-top: 12px;
+  font-size: 10px;
+  color: #94a3b8;
+  font-family: monospace;
+}
+
+/* ────────────────────────────────────────────────────
+   PREVIEW DE FORMATOS TELA (A4, A5, BOBINA)
+   ──────────────────────────────────────────────────── */
+
+/* Modo A5 na tela */
+.folha-timbrada--a5 {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 16px;
+  font-size: 13px;
+}
+
+.folha-timbrada--a5 .folha-timbrada__corpo-renderizado {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.folha-timbrada--a5 table {
+  font-size: 12px !important;
+}
+
+/* Modo Bobina na tela */
+.folha-timbrada--bobina {
+  max-width: 320px;
+  margin: 0 auto;
+  padding: 14px;
+  border: 1px dashed #00A8CC;
+  background-color: #fffdfa;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.folha-timbrada--bobina .folha-timbrada__cabecalho {
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  border-bottom: 1px dashed #00A8CC;
+  padding-bottom: 10px;
+}
+
+.folha-timbrada--bobina .folha-timbrada__clinica-dados {
+  text-align: center;
+  font-size: 11px;
+  margin-top: 6px;
+}
+
+.folha-timbrada--bobina .folha-timbrada__corpo-renderizado {
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.folha-timbrada--bobina table {
+  width: 100% !important;
+  font-size: 10px !important;
+}
+
+.folha-timbrada--bobina table th,
+.folha-timbrada--bobina table td {
+  padding: 4px 2px !important;
+  font-size: 10px !important;
+}
+
+.folha-timbrada--bobina .folha-timbrada__rodape {
+  margin-top: 20px;
+  padding-top: 10px;
+  border-top: 1px dashed #cbd5e1;
+}
+
+/* ────────────────────────────────────────────────────
+   REGRAS DE IMPRESSÃO (@media print) DEDICADAS
+   ──────────────────────────────────────────────────── */
+@media print {
+  /* Oculta tudo na tela com exceção da folha timbrada */
+  body * {
+    visibility: hidden !important;
+  }
+
+  body:has(.folha-timbrada-modal) .folha-timbrada-modal,
+  body:has(.folha-timbrada-modal) .folha-timbrada-modal * {
+    visibility: visible !important;
+  }
+
+  .no-print,
+  .modal-emissao-backdrop,
+  .modal-emissao__header,
+  .modal-emissao__footer,
+  .emissao-concluida-header,
+  .seletor-impressao-container,
+  .sidebar,
+  .topbar,
+  header,
+  nav,
+  aside {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  /* 1. FORMATO A4 (Padrão Folha Inteira) */
+  body:has(.folha-timbrada--a4) .folha-timbrada-modal {
+    position: absolute !important;
+    left: 0;
+    top: 0;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 10mm !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  /* 2. FORMATO A5 (Meia Folha) */
+  body:has(.folha-timbrada--a5) .folha-timbrada-modal {
+    position: absolute !important;
+    left: 0;
+    top: 0;
+    width: 100% !important;
+    max-width: 148mm !important;
+    margin: 0 !important;
+    padding: 6mm !important;
+    box-shadow: none !important;
+    border: none !important;
+    font-size: 12px !important;
+    line-height: 1.35 !important;
+  }
+
+  body:has(.folha-timbrada--a5) .folha-timbrada__cabecalho {
+    padding-bottom: 8px !important;
+    margin-bottom: 12px !important;
+  }
+
+  body:has(.folha-timbrada--a5) .folha-timbrada__corpo-renderizado {
+    font-size: 12px !important;
+    line-height: 1.35 !important;
+  }
+
+  body:has(.folha-timbrada--a5) table {
+    font-size: 11px !important;
+  }
+
+  /* 3. FORMATO BOBINA TÉRMICA (80mm / 58mm) */
+  body:has(.folha-timbrada--bobina) .folha-timbrada-modal {
+    position: absolute !important;
+    left: 0;
+    top: 0;
+    width: 100% !important;
+    max-width: 76mm !important;
+    margin: 0 auto !important;
+    padding: 2mm !important;
+    box-shadow: none !important;
+    border: none !important;
+    font-size: 10px !important;
+    line-height: 1.25 !important;
+  }
+
+  body:has(.folha-timbrada--bobina) .folha-timbrada__cabecalho {
+    flex-direction: column !important;
+    align-items: center !important;
+    text-align: center !important;
+    border-bottom: 1px dashed #000 !important;
+    padding-bottom: 6px !important;
+    margin-bottom: 10px !important;
+  }
+
+  body:has(.folha-timbrada--bobina) .folha-timbrada__logo img {
+    max-height: 36px !important;
+  }
+
+  body:has(.folha-timbrada--bobina) .folha-timbrada__clinica-dados {
+    text-align: center !important;
+    font-size: 9px !important;
+    margin-top: 4px !important;
+  }
+
+  body:has(.folha-timbrada--bobina) .folha-timbrada__corpo-renderizado {
+    font-size: 10px !important;
+    line-height: 1.25 !important;
+  }
+
+  body:has(.folha-timbrada--bobina) table {
+    width: 100% !important;
+    font-size: 9px !important;
+    border-collapse: collapse !important;
+  }
+
+  body:has(.folha-timbrada--bobina) table th,
+  body:has(.folha-timbrada--bobina) table td {
+    padding: 2px 1px !important;
+    font-size: 9px !important;
+  }
+
+  body:has(.folha-timbrada--bobina) .folha-timbrada__rodape {
+    margin-top: 12px !important;
+    padding-top: 6px !important;
+    border-top: 1px dashed #000 !important;
+    text-align: center !important;
+    font-size: 9px !important;
+  }
+
+  body:has(.folha-timbrada--bobina) .folha-timbrada__assinatura-linha {
+    width: 140px !important;
+    margin-bottom: 4px !important;
+  }
+
+  body:has(.folha-timbrada--bobina) .folha-timbrada__aviso-legal {
+    display: none !important;
+  }
+}

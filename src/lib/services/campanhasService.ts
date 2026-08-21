@@ -29,23 +29,23 @@ export const campanhasService = {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      
+
       // Busca estatísticas da fila para cada campanha (Idealmente via Edge Function ou RPC, mas fazemos em lotes aqui para Fase 2)
       const campanhasComMetricas = await Promise.all((data || []).map(async (campanha) => {
         const { data: stats } = await supabase
           .rpc('get_campanha_stats', { p_campanha_id: campanha.id })
           .single();
-          
+
         // Se a RPC não existir ainda, faremos fallback para count manual no banco
         if (!stats) {
-            const res = await supabase.from('campanha_disparos').select('status', { count: 'exact' }).eq('campanha_id', campanha.id);
-            const total = res.data?.length || 0;
-            const enviados = res.data?.filter(d => d.status === 'enviado').length || 0;
-            const falhas = res.data?.filter(d => d.status === 'falha').length || 0;
-            const pendentes = res.data?.filter(d => d.status === 'pendente').length || 0;
-            return { ...campanha, disparos: { total, enviados, falhas, pendentes } };
+          const res = await supabase.from('campanha_disparos').select('status', { count: 'exact' }).eq('campanha_id', campanha.id);
+          const total = res.data?.length || 0;
+          const enviados = res.data?.filter(d => d.status === 'enviado').length || 0;
+          const falhas = res.data?.filter(d => d.status === 'falha').length || 0;
+          const pendentes = res.data?.filter(d => d.status === 'pendente').length || 0;
+          return { ...campanha, disparos: { total, enviados, falhas, pendentes } };
         }
-        
+
         return { ...campanha, disparos: stats };
       }));
 
@@ -71,7 +71,7 @@ export const campanhasService = {
 
       // 2.2 Avaliar Segmento (Puxar IDs dos Clientes)
       const clientes = await segmentosService.evaluateSegmentoClientes(regrasSegmento);
-      
+
       if (!clientes || clientes.length === 0) {
         // Campanha vazia
         await supabase.from('campanhas').update({ status: 'concluida' }).eq('id', campanhaId);
@@ -123,29 +123,29 @@ export const campanhasService = {
         let textoFinal = template.replace(/\{\{nome\}\}/g, clienteNome.split(' ')[0]);
 
         if (!clienteWhatsapp) {
-           await supabase.from('campanha_disparos').update({ 
-               status: 'falha', erro_log: 'WhatsApp não cadastrado' 
-           }).eq('id', disparo.id);
-           continue;
+          await supabase.from('campanha_disparos').update({
+            status: 'falha', erro_log: 'WhatsApp não cadastrado'
+          }).eq('id', disparo.id);
+          continue;
         }
 
         // SIMULAÇÃO DE ENVIO API META / WAHA
         console.log(`[Worker] Enviando WhatsApp para ${clienteNome} (${clienteWhatsapp}):`, textoFinal);
-        
+
         // Simula latência de rede
         await new Promise(r => setTimeout(r, 500));
 
         // Marca como sucesso
-        await supabase.from('campanha_disparos').update({ 
-            status: 'enviado', 
-            mensagem_processada: textoFinal,
-            data_envio: new Date().toISOString()
+        await supabase.from('campanha_disparos').update({
+          status: 'enviado',
+          mensagem_processada: textoFinal,
+          data_envio: new Date().toISOString()
         }).eq('id', disparo.id);
       }
 
       // Atualiza campanhas concluídas
       // Se a campanha não tem mais pendentes nem processando, muda status
-      
+
       return fila.length;
     } catch (e) {
       console.error('Erro no worker de disparo:', e);

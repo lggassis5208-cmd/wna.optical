@@ -1,6 +1,6 @@
 import { supabase } from '../supabase';
 
-export type Operator = 
+export type Operator =
   | 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'between'
   | 'contains' | 'starts_with' | 'in' | 'is_null' | 'is_not_null'
   | 'is_true' | 'is_false' | 'last_x_days' | 'last_x_months' | 'next_x_days';
@@ -48,48 +48,56 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
   { value: 'ultima_consulta', label: 'Última Consulta', type: 'date' },
   { value: 'validade_receita', label: 'Validade da Receita', type: 'date', sensitive: true },
   { value: 'dias_ultima_compra', label: 'Dias desde Última Compra', type: 'number' },
-  
+
   // Produto
-  { value: 'tipo_lente', label: 'Tipo de Lente', type: 'enum', sensitive: true, options: [
-    { value: 'monofocal', label: 'Monofocal' },
-    { value: 'multifocal', label: 'Multifocal' },
-    { value: 'ocupacional', label: 'Ocupacional' }
-  ]},
+  {
+    value: 'tipo_lente', label: 'Tipo de Lente', type: 'enum', sensitive: true, options: [
+      { value: 'monofocal', label: 'Monofocal' },
+      { value: 'multifocal', label: 'Multifocal' },
+      { value: 'ocupacional', label: 'Ocupacional' }
+    ]
+  },
   { value: 'tipo_armacao', label: 'Tipo de Armação', type: 'text' },
   { value: 'marca', label: 'Marca da Armação', type: 'text' },
-  
+
   // Clínico/Óptico
   { value: 'grau_esferico', label: 'Grau Esférico', type: 'number', sensitive: true },
   { value: 'grau_cilindrico', label: 'Grau Cilíndrico', type: 'number', sensitive: true },
   { value: 'adicao', label: 'Adição', type: 'number', sensitive: true },
-  
+
   // Comercial
   { value: 'ticket_medio', label: 'Ticket Médio', type: 'number' },
   { value: 'ltv_total', label: 'LTV Total (R$)', type: 'number' },
   { value: 'num_compras', label: 'Número de Compras', type: 'number' },
   { value: 'convenio', label: 'Convênio', type: 'text' },
-  
+
   // Pessoal
   { value: 'idade', label: 'Idade', type: 'number' },
   { value: 'mes_aniversario', label: 'Mês do Aniversário (1-12)', type: 'number' },
   { value: 'cidade', label: 'Cidade', type: 'text' },
-  { value: 'status', label: 'Status', type: 'enum', options: [
-    { value: 'ativo', label: 'Ativo' },
-    { value: 'inativo', label: 'Inativo' },
-    { value: 'lead', label: 'Lead' }
-  ]},
-  { value: 'temperatura', label: 'Temperatura (Lead)', type: 'enum', options: [
-    { value: 'frio', label: 'Frio' },
-    { value: 'morno', label: 'Morno' },
-    { value: 'quente', label: 'Quente' },
-    { value: 'fidelizado', label: 'Fidelizado' }
-  ]},
-  { value: 'canal_origem', label: 'Origem do Cliente', type: 'enum', options: [
-    { value: 'whatsapp', label: 'WhatsApp' },
-    { value: 'anuncio', label: 'Anúncio / Instagram' },
-    { value: 'indicacao', label: 'Indicação' },
-    { value: 'passagem', label: 'Passagem na Loja' }
-  ]},
+  {
+    value: 'status', label: 'Status', type: 'enum', options: [
+      { value: 'ativo', label: 'Ativo' },
+      { value: 'inativo', label: 'Inativo' },
+      { value: 'lead', label: 'Lead' }
+    ]
+  },
+  {
+    value: 'temperatura', label: 'Temperatura (Lead)', type: 'enum', options: [
+      { value: 'frio', label: 'Frio' },
+      { value: 'morno', label: 'Morno' },
+      { value: 'quente', label: 'Quente' },
+      { value: 'fidelizado', label: 'Fidelizado' }
+    ]
+  },
+  {
+    value: 'canal_origem', label: 'Origem do Cliente', type: 'enum', options: [
+      { value: 'whatsapp', label: 'WhatsApp' },
+      { value: 'anuncio', label: 'Anúncio / Instagram' },
+      { value: 'indicacao', label: 'Indicação' },
+      { value: 'passagem', label: 'Passagem na Loja' }
+    ]
+  },
 ];
 
 export const OPERATORS_BY_TYPE: Record<FieldType, { value: Operator; label: string }[]> = {
@@ -132,7 +140,7 @@ export const OPERATORS_BY_TYPE: Record<FieldType, { value: Operator; label: stri
 function buildFilterString(node: Rule | RuleGroup): string {
   if (node.type === 'rule') {
     const { field, operator, value } = node;
-    
+
     // Tratamento especial para operadores customizados
     if (operator === 'is_true') return `${field}.eq.true`;
     if (operator === 'is_false') return `${field}.eq.false`;
@@ -165,7 +173,7 @@ function buildFilterString(node: Rule | RuleGroup): string {
     const childFilters = node.rules.map(buildFilterString).filter(Boolean);
     if (childFilters.length === 0) return '';
     if (childFilters.length === 1) return childFilters[0];
-    
+
     const condition = node.condition.toLowerCase(); // 'and' | 'or'
     return `${condition}(${childFilters.join(',')})`;
   }
@@ -222,7 +230,7 @@ export const segmentosService = {
       }
 
       const filterString = buildFilterString(ast);
-      
+
       // 1. Total Filtro (Bate com os critérios geográficos/clínicos/comerciais)
       let queryFiltro = supabase.from('v_clientes_metricas').select('cliente_id', { count: 'exact', head: true });
       if (filterString) {
@@ -273,7 +281,7 @@ export const segmentosService = {
       if (filterString) {
         queryElegivel = queryElegivel.or(filterString);
       }
-      
+
       const { data: clients, count: countElegivel, error: errElegivel } = await queryElegivel.limit(20);
       if (errElegivel) throw errElegivel;
 

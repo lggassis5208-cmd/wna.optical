@@ -49,7 +49,7 @@ export default function CampanhasPage() {
         </div>
         <div className="flex items-center gap-3 w-full md:w-auto">
           {/* Botão temporário para simular o Cron / Edge Function da Vercel */}
-          <button 
+          <button
             onClick={handleSimularDisparo}
             disabled={simulando}
             className="bg-white/5 border border-white/10 text-white font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 hover:bg-white/10 transition-all active:scale-95 disabled:opacity-50"
@@ -58,8 +58,8 @@ export default function CampanhasPage() {
             <RefreshCw size={18} className={simulando ? 'animate-spin' : ''} />
             {simulando ? 'Processando Lote...' : 'Worker: Forçar Disparo'}
           </button>
-          
-          <button 
+
+          <button
             onClick={() => setIsModalOpen(true)}
             className="bg-green-500 text-black font-bold px-6 py-2.5 rounded-xl flex items-center gap-2 hover:shadow-lg hover:shadow-green-500/20 transition-all active:scale-95 whitespace-nowrap"
           >
@@ -69,31 +69,31 @@ export default function CampanhasPage() {
         </div>
       </div>
 
-      <CampaignBuilderModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        onSuccess={loadCampanhas} 
+      <CampaignBuilderModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSuccess={loadCampanhas}
       />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <MetricCard 
+        <MetricCard
           icon={<Send />}
           title="Total Agendado"
           value={campanhas.reduce((acc, curr) => acc + (curr.disparos?.total || 0), 0).toString()}
         />
-        <MetricCard 
+        <MetricCard
           icon={<CheckCircle2 />}
           title="Mensagens Entregues"
           value={campanhas.reduce((acc, curr) => acc + (curr.disparos?.enviados || 0), 0).toString()}
           valueClass="text-green-500"
         />
-        <MetricCard 
+        <MetricCard
           icon={<Clock />}
           title="Fila Pendente"
           value={campanhas.reduce((acc, curr) => acc + (curr.disparos?.pendentes || 0), 0).toString()}
           valueClass="text-primary"
         />
-        <MetricCard 
+        <MetricCard
           icon={<AlertCircle />}
           title="Falhas de Envio"
           value={campanhas.reduce((acc, curr) => acc + (curr.disparos?.falhas || 0), 0).toString()}
@@ -117,20 +117,20 @@ export default function CampanhasPage() {
               {loading ? (
                 <tr>
                   <td colSpan={5} className="px-6 py-12 text-center text-white/40">
-                     Carregando fila de campanhas...
+                    Carregando fila de campanhas...
                   </td>
                 </tr>
               ) : campanhas.length === 0 ? (
                 <tr>
-                   <td colSpan={5} className="px-6 py-10 text-center text-white/20 italic">
-                      Nenhuma campanha encontrada.
-                   </td>
+                  <td colSpan={5} className="px-6 py-10 text-center text-white/20 italic">
+                    Nenhuma campanha encontrada.
+                  </td>
                 </tr>
               ) : campanhas.map((camp) => {
                 const total = camp.disparos?.total || 0;
                 const processados = (camp.disparos?.enviados || 0) + (camp.disparos?.falhas || 0);
                 const percentual = total === 0 ? 0 : Math.round((processados / total) * 100);
-                
+
                 return (
                   <tr key={camp.id} className="hover:bg-white/[0.02] transition-colors group cursor-pointer">
                     <td className="px-6 py-4">
@@ -150,7 +150,7 @@ export default function CampanhasPage() {
                           <span>{percentual}%</span>
                         </div>
                         <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
-                          <div 
+                          <div
                             className="bg-green-500 h-full rounded-full transition-all duration-500"
                             style={{ width: `${percentual}%` }}
                           />
@@ -159,9 +159,9 @@ export default function CampanhasPage() {
                     </td>
                     <td className="px-6 py-4">
                       <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border
-                        ${camp.status === 'concluida' ? 'bg-green-500/10 text-green-500 border-green-500/20' : 
+                        ${camp.status === 'concluida' ? 'bg-green-500/10 text-green-500 border-green-500/20' :
                           camp.status === 'processando' ? 'bg-primary/10 text-primary border-primary/20 animate-pulse' :
-                          'bg-white/10 text-white/40 border-white/20'}
+                            'bg-white/10 text-white/40 border-white/20'}
                       `}>
                         {camp.status}
                       </span>

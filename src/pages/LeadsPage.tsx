@@ -47,6 +47,7 @@ export interface Lead {
   atualizado_em: string;
   ultimo_contato_em: string;
   cliente_id: string | null;
+  tipo?: 'lead' | 'cliente';
 }
 
 export interface LeadEvento {
@@ -137,10 +138,10 @@ export default function LeadsPage() {
           criado_em,
           atualizado_em,
           ultimo_contato_em,
-          cliente_id
+          cliente_id,
+          tipo
         `)
         .eq('tenant_id', activeTenant)
-        .eq('tipo', 'lead')
         .order('atualizado_em', { ascending: false });
 
       if (error) throw error;
@@ -700,6 +701,15 @@ export default function LeadsPage() {
                           
                           {/* Badges */}
                           <div className="flex flex-wrap gap-1.5 mt-3">
+                            {lead.tipo === 'cliente' ? (
+                              <span className="text-[8px] font-black uppercase tracking-widest bg-amber-500/20 border border-amber-500/30 text-amber-300 px-2 py-0.5 rounded-md">
+                                👤 Paciente/Cliente
+                              </span>
+                            ) : (
+                              <span className="text-[8px] font-black uppercase tracking-widest bg-blue-500/10 border border-blue-500/20 text-blue-400 px-2 py-0.5 rounded-md">
+                                📌 Lead
+                              </span>
+                            )}
                             <span className="text-[8px] font-black uppercase tracking-widest bg-white/5 border border-white/10 text-white/50 px-2 py-0.5 rounded-md">
                               {lead.origem}
                             </span>

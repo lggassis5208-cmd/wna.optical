@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
-import { X, User, Activity, ShoppingBag, Phone, FileText, ChevronRight } from 'lucide-react';
+import { X, User, Activity, ShoppingBag, Phone, FileText, Plus, Printer, Lock, MessageCircle, Star } from 'lucide-react';
 import { storage } from '../lib/storage';
 import { formatDate } from '../lib/dateUtils';
 import { openWhatsApp } from '../lib/whatsappUtils';
 import { crmEventsService, type CrmEvent } from '../lib/services/crmEventsService';
-import { MessageCircle, Megaphone, CalendarCheck, Star } from 'lucide-react';
+import { fichasMedicasService, type FichaMedica } from '../lib/services/fichasMedicasService';
+import FichaMedicaFormModal from './FichaMedicaFormModal';
+import FichaMedicaPDF from './FichaMedicaPDF';
+import { maskCpf } from '../lib/cryptoUtils';
 
 interface ClientProfileModalProps {
   isOpen: boolean;
@@ -16,7 +19,15 @@ export default function ClientProfileModal({ isOpen, onClose, clientId }: Client
   const [activeTab, setActiveTab] = useState<'dados' | 'clinico' | 'compras' | 'crm'>('dados');
   const [client, setClient] = useState<any>(null);
   const [sales, setSales] = useState<any[]>([]);
+  const [fichas, setFichas] = useState<FichaMedica[]>([]);
   const [crmEvents, setCrmEvents] = useState<CrmEvent[]>([]);
+
+  // Submodais de Ficha Médica
+  const [formModalOpen, setFormModalOpen] = useState(false);
+  const [pdfModalOpen, setPdfModalOpen] = useState(false);
+  const [selectedFichaId, setSelectedFichaId] = useState<string | null>(null);
+  const [selectedPdfFicha, setSelectedPdfFicha] = useState<FichaMedica | null>(null);
+  const [adendoPaiId, setAdendoPaiId] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen && clientId) {
@@ -30,12 +41,38 @@ export default function ClientProfileModal({ isOpen, onClose, clientId }: Client
     
     const allSales = await storage.getSales();
     const clientSales = allSales.filter((s: any) => s.cliente_id === id || s.paciente_cpf === c?.cpf);
-    // Ordenar por data decrescente
     clientSales.sort((a: any, b: any) => new Date(b.criado_em).getTime() - new Date(a.criado_em).getTime());
     setSales(clientSales);
 
+    // Carregar Prontuários Médicos Reais do Paciente
+    const clientFichas = await fichasMedicasService.getFichas({ clienteId: id });
+    setFichas(clientFichas);
+
     const events = await crmEventsService.getEventsByClient(id);
     setCrmEvents(events);
+  };
+
+  const handleOpenNovaFicha = () => {
+    setSelectedFichaId(null);
+    setAdendoPaiId(null);
+    setFormModalOpen(true);
+  };
+
+  const handleOpenEditFicha = (f: FichaMedica) => {
+    setSelectedFichaId(f.id);
+    setAdendoPaiId(null);
+    setFormModalOpen(true);
+  };
+
+  const handleOpenAdendo = (f: FichaMedica) => {
+    setSelectedFichaId(null);
+    setAdendoPaiId(f.id);
+    setFormModalOpen(true);
+  };
+
+  const handleOpenPdf = (f: FichaMedica) => {
+    setSelectedPdfFicha(f);
+    setPdfModalOpen(true);
   };
 
   if (!isOpen || !client) return null;
@@ -56,7 +93,7 @@ export default function ClientProfileModal({ isOpen, onClose, clientId }: Client
               <h2 className="text-2xl sm:text-3xl font-black text-white">{client.name}</h2>
               <div className="flex items-center gap-3 mt-2">
                 <span className="px-3 py-1 bg-white/5 rounded-full text-xs font-bold text-white/60 font-mono">
-                  {client.cpf || 'Sem CPF'}
+                  {maskCpf(client.cpf)}
                 </span>
                 <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-xs font-black uppercase tracking-widest border border-primary/20">
                   Score: {client.lis_score || 850}
@@ -84,13 +121,13 @@ export default function ClientProfileModal({ isOpen, onClose, clientId }: Client
             active={activeTab === 'clinico'} 
             onClick={() => setActiveTab('clinico')} 
             icon={<Activity size={18} />} 
-            label="Histórico Clínico" 
+            label={`Prontuário Médico (${fichas.length})`} 
           />
           <TabButton 
             active={activeTab === 'compras'} 
             onClick={() => setActiveTab('compras')} 
             icon={<ShoppingBag size={18} />} 
-            label="Histórico de Compras" 
+            label={`Compras (${sales.length})`} 
           />
           <TabButton 
             active={activeTab === 'crm'} 
@@ -108,7 +145,7 @@ export default function ClientProfileModal({ isOpen, onClose, clientId }: Client
             <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <DataCard label="Nome Completo" value={client.name} />
-                <DataCard label="CPF" value={client.cpf} fontMono />
+                <DataCard label="CPF (Dado Protegido)" value={maskCpf(client.cpf)} fontMono />
                 <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
                   <p className="text-[10px] text-white/40 font-black uppercase tracking-widest mb-2">WhatsApp</p>
                   <div className="flex items-center justify-between">
@@ -136,62 +173,124 @@ export default function ClientProfileModal({ isOpen, onClose, clientId }: Client
             </div>
           )}
 
-          {/* ABA 2: HISTÓRICO CLÍNICO */}
+          {/* ABA 2: HISTÓRICO CLÍNICO & PRONTUÁRIOS MÉDICOS */}
           {activeTab === 'clinico' && (
             <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-              {sales.filter(s => s.od_esferico || s.oe_esferico).length === 0 ? (
-                <div className="text-center py-12 border-2 border-dashed border-white/10 rounded-3xl">
-                  <Activity size={48} className="mx-auto text-white/20 mb-4" />
-                  <p className="text-white/40">Nenhuma ficha clínica com dados de receita encontrada.</p>
+              
+              <div className="flex justify-between items-center bg-white/[0.02] p-4 rounded-2xl border border-white/10">
+                <div>
+                  <h3 className="font-bold text-white text-sm">Histórico de Refração & Prontuários Médicos</h3>
+                  <p className="text-xs text-white/50">Append-only, imutável e auditado conforme exigências LGPD/CFM</p>
+                </div>
+                <button
+                  onClick={handleOpenNovaFicha}
+                  className="px-4 py-2 bg-primary hover:bg-primary/90 text-black font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 shadow-lg shadow-primary/10"
+                >
+                  <Plus size={16} /> Nova Ficha Médica
+                </button>
+              </div>
+
+              {fichas.length === 0 ? (
+                <div className="text-center py-12 border-2 border-dashed border-white/10 rounded-3xl space-y-3">
+                  <Activity size={48} className="mx-auto text-white/20" />
+                  <p className="text-white/40 text-sm">Nenhum prontuário médico registrado para este paciente.</p>
+                  <button
+                    onClick={handleOpenNovaFicha}
+                    className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition-all"
+                  >
+                    Registrar Primeira Ficha Médica
+                  </button>
                 </div>
               ) : (
-                <div className="space-y-6">
-                  {sales.filter(s => s.od_esferico || s.oe_esferico).map(s => (
-                    <div key={s.id} className="bg-white/[0.02] border border-white/10 rounded-2xl p-6">
-                      <div className="flex justify-between items-center mb-4 border-b border-white/5 pb-4">
-                        <div className="flex items-center gap-3">
-                          <FileText className="text-primary" size={20} />
-                          <span className="font-bold">Ficha Clínica / O.S. #{s.os_number}</span>
+                <div className="space-y-4">
+                  {fichas.map((f) => {
+                    const rod = f.refracoes?.find(r => r.olho === 'OD');
+                    const roe = f.refracoes?.find(r => r.olho === 'OE');
+
+                    return (
+                      <div key={f.id} className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 space-y-4">
+                        
+                        <div className="flex flex-wrap justify-between items-center gap-2 border-b border-white/5 pb-3">
+                          <div className="flex items-center gap-3">
+                            <FileText className="text-primary" size={20} />
+                            <div>
+                              <span className="font-bold text-sm text-white">Exame Realizado em {formatDate(f.data_exame)}</span>
+                              <p className="text-[11px] text-white/50">Optometrista: {f.atendido_por}</p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+                              f.status === 'finalizada'
+                                ? 'bg-green-500/10 text-green-400 border-green-500/20'
+                                : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
+                            }`}>
+                              {f.status === 'finalizada' ? 'Finalizada & Imutável' : 'Rascunho'}
+                            </span>
+
+                            {f.tipo === 'retificacao' && (
+                              <span className="px-2.5 py-1 bg-purple-500/10 text-purple-400 border border-purple-500/20 rounded-full text-[10px] font-bold">
+                                Adendo
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <span className="text-sm text-white/40 font-medium">{formatDate(s.criado_em)}</span>
+
+                        {/* Tabela Resumo OD / OE */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                          <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-xl">
+                            <strong className="text-blue-400 block text-xs font-black mb-1">OD (Olho Direito)</strong>
+                            <p className="font-mono text-white/90">
+                              Esf: {rod?.esferico ?? 0} | Cil: {rod?.cilindrico ?? 0} | Eixo: {rod?.eixo ?? 0}°
+                            </p>
+                            {rod?.adicao ? <p className="text-[11px] text-blue-300/80 font-mono mt-0.5">Adição: +{rod.adicao}</p> : null}
+                          </div>
+
+                          <div className="bg-purple-500/10 border border-purple-500/20 p-3 rounded-xl">
+                            <strong className="text-purple-400 block text-xs font-black mb-1">OE (Olho Esquerdo)</strong>
+                            <p className="font-mono text-white/90">
+                              Esf: {roe?.esferico ?? 0} | Cil: {roe?.cilindrico ?? 0} | Eixo: {roe?.eixo ?? 0}°
+                            </p>
+                            {roe?.adicao ? <p className="text-[11px] text-purple-300/80 font-mono mt-0.5">Adição: +{roe.adicao}</p> : null}
+                          </div>
+                        </div>
+
+                        {/* Footer Ações */}
+                        <div className="flex flex-wrap justify-between items-center gap-2 pt-2 border-t border-white/5 text-xs text-white/50">
+                          <span>Validade Receita: <strong className="text-primary">{formatDate(f.validade_receita)}</strong></span>
+
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleOpenEditFicha(f)}
+                              className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-all text-xs font-bold border border-white/10 flex items-center gap-1"
+                            >
+                              {f.status === 'finalizada' ? <Lock size={12} /> : <FileText size={12} />}
+                              {f.status === 'finalizada' ? 'Ver Ficha' : 'Editar'}
+                            </button>
+
+                            {f.status === 'finalizada' && (
+                              <>
+                                <button
+                                  onClick={() => handleOpenPdf(f)}
+                                  className="px-3 py-1.5 bg-green-600/20 hover:bg-green-600/30 text-green-400 rounded-lg transition-all text-xs font-bold border border-green-500/30 flex items-center gap-1"
+                                >
+                                  <Printer size={12} /> Imprimir / Receita
+                                </button>
+
+                                <button
+                                  onClick={() => handleOpenAdendo(f)}
+                                  className="px-3 py-1.5 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 rounded-lg transition-all text-xs font-bold border border-yellow-500/30 flex items-center gap-1"
+                                >
+                                  <Plus size={12} /> Retificar por Adendo
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+
                       </div>
-                      
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-center text-sm border-collapse">
-                          <thead>
-                            <tr className="bg-black/20 text-[10px] text-white/40 uppercase tracking-widest font-black">
-                              <th className="p-2">Olho</th>
-                              <th className="p-2">Esférico</th>
-                              <th className="p-2">Cilíndrico</th>
-                              <th className="p-2">Eixo</th>
-                              <th className="p-2">DNP</th>
-                              <th className="p-2">Altura</th>
-                              <th className="p-2">Adição</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-white/5">
-                            <tr className="hover:bg-white/5 transition-colors">
-                              <td className="p-3 font-bold text-white/70">OD (Direito)</td>
-                              <td className="p-3 font-mono">{s.od_esferico || '---'}</td>
-                              <td className="p-3 font-mono">{s.od_cilindrico || '---'}</td>
-                              <td className="p-3 font-mono">{s.od_eixo || '---'}</td>
-                              <td className="p-3 font-mono">{s.dnp_od || '---'}</td>
-                              <td className="p-3 font-mono">{s.altura_od || '---'}</td>
-                              <td className="p-3 font-mono" rowSpan={2}>{s.adicao || '---'}</td>
-                            </tr>
-                            <tr className="hover:bg-white/5 transition-colors">
-                              <td className="p-3 font-bold text-white/70">OE (Esquerdo)</td>
-                              <td className="p-3 font-mono">{s.oe_esferico || '---'}</td>
-                              <td className="p-3 font-mono">{s.oe_cilindrico || '---'}</td>
-                              <td className="p-3 font-mono">{s.oe_eixo || '---'}</td>
-                              <td className="p-3 font-mono">{s.dnp_oe || '---'}</td>
-                              <td className="p-3 font-mono">{s.altura_oe || '---'}</td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -254,24 +353,19 @@ export default function ClientProfileModal({ isOpen, onClose, clientId }: Client
               {crmEvents.length === 0 ? (
                 <div className="text-center py-12 border-2 border-dashed border-white/10 rounded-3xl">
                   <MessageCircle size={48} className="mx-auto text-white/20 mb-4" />
-                  <p className="text-white/40">Nenhum evento de relacionamento registrado.</p>
+                  <p className="text-white/40">Nenhum evento de CRM registrado.</p>
                 </div>
               ) : (
-                <div className="relative border-l border-white/10 ml-4 space-y-6 pb-4">
-                  {crmEvents.map(event => (
-                    <div key={event.id} className="relative pl-6">
-                      <div className="absolute -left-1.5 top-1.5 w-3 h-3 rounded-full bg-primary ring-4 ring-background" />
-                      <div className="bg-white/[0.02] border border-white/5 p-4 rounded-2xl">
-                        <div className="flex justify-between items-start mb-2">
-                          <p className="font-bold text-sm text-primary uppercase tracking-widest">{event.tipo_evento.replace('_', ' ')}</p>
-                          <span className="text-xs text-white/40 font-mono">{formatDate(event.criado_em!)}</span>
-                        </div>
-                        {event.payload && (
-                          <pre className="text-xs text-white/60 bg-black/20 p-2 rounded-lg mt-2 overflow-x-auto">
-                            {JSON.stringify(event.payload, null, 2)}
-                          </pre>
-                        )}
+                <div className="space-y-4">
+                  {crmEvents.map(e => (
+                    <div key={e.id || Math.random().toString()} className="p-4 bg-white/[0.02] border border-white/5 rounded-2xl">
+                      <div className="flex justify-between items-start mb-2">
+                        <span className="font-bold text-sm text-white uppercase tracking-wider font-mono">{(e as any).titulo || e.tipo_evento}</span>
+                        <span className="text-xs text-white/40 font-mono">{formatDate((e as any).em || e.criado_em)}</span>
                       </div>
+                      {((e as any).conteudo || e.payload) && (
+                        <p className="text-xs text-white/70 italic">"{(e as any).conteudo || JSON.stringify(e.payload)}"</p>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -280,32 +374,53 @@ export default function ClientProfileModal({ isOpen, onClose, clientId }: Client
           )}
 
         </div>
+
       </div>
+
+      {/* Submodais de Ficha Médica */}
+      <FichaMedicaFormModal
+        isOpen={formModalOpen}
+        onClose={() => setFormModalOpen(false)}
+        clienteId={clientId}
+        clientData={client}
+        fichaToEditId={selectedFichaId}
+        fichaPaiIdForAdendo={adendoPaiId}
+        onSaved={() => clientId && loadClientData(clientId)}
+      />
+
+      <FichaMedicaPDF
+        isOpen={pdfModalOpen}
+        onClose={() => setPdfModalOpen(false)}
+        ficha={selectedPdfFicha}
+      />
+
     </div>
   );
 }
 
-function TabButton({ active, onClick, icon, label }: any) {
+function TabButton({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string }) {
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-2 px-6 py-4 font-bold text-sm transition-all border-b-2 ${
+      className={`flex items-center gap-2 px-6 py-4 font-bold text-xs transition-all border-b-2 whitespace-nowrap ${
         active 
           ? 'border-primary text-primary bg-primary/5' 
-          : 'border-transparent text-white/40 hover:text-white/80 hover:bg-white/5'
+          : 'border-transparent text-white/40 hover:text-white/70 hover:bg-white/[0.02]'
       }`}
     >
       {icon}
-      {label}
+      <span>{label}</span>
     </button>
   );
 }
 
-function DataCard({ label, value, fontMono = false }: any) {
+function DataCard({ label, value, fontMono }: { label: string; value?: string; fontMono?: boolean }) {
   return (
     <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
       <p className="text-[10px] text-white/40 font-black uppercase tracking-widest mb-1">{label}</p>
-      <p className={`text-sm ${fontMono ? 'font-mono' : 'font-medium'} text-white`}>{value || '---'}</p>
+      <p className={`text-sm text-white ${fontMono ? 'font-mono' : 'font-semibold'}`}>
+        {value || 'Não informado'}
+      </p>
     </div>
   );
 }

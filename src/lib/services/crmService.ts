@@ -1,5 +1,6 @@
 import { supabase } from '../supabase';
 import { subDays, subMonths, startOfDay, endOfDay, format } from 'date-fns';
+import { fichasMedicasService } from './fichasMedicasService';
 
 export interface CrmCliente {
   id: string;
@@ -68,10 +69,30 @@ export const crmService = {
   },
 
   /**
-   * Busca vendas realizadas há exatos X meses (padrão 11 meses) para renovação de receita.
+   * Busca receitas cuja data real de validade_receita está vencendo (Ótica Lìs CRM).
+   * Alimenta o gatilho "Renovação de Receita" do Robô de Pós-Venda.
    */
-  async buscarReceitasVencendo(meses: number = 11): Promise<CrmVenda[]> {
-    const targetDate = subMonths(new Date(), meses);
+  async buscarReceitasVencendo(diasParaVencer: number = 30): Promise<any[]> {
+    try {
+      // 1. Tentar buscar por validade_receita real das fichas médicas finalizadas
+      const fichasVencendo = await fichasMedicasService.buscarReceitasVencendoReais(diasParaVencer);
+      if (fichasVencendo && fichasVencendo.length > 0) {
+        return fichasVencendo.map(f => ({
+          id: f.id,
+          cliente_id: f.cliente_id,
+          data_venda: f.data_exame,
+          validade_receita: f.validade_receita,
+          valor_bruto: 0,
+          status: 'CONCLUIDA',
+          cliente: f.cliente || { id: f.cliente_id, nome: f.nome, whatsapp: f.telefone }
+        }));
+      }
+    } catch (e) {
+      console.warn('Erro ao buscar fichas médicas vencendo, usando aproximação de vendas legadas:', e);
+    }
+
+    // 2. Fallback para estimativa legada de 11 meses baseada em vendas
+    const targetDate = subMonths(new Date(), 11);
     const start = startOfDay(targetDate).toISOString();
     const end = endOfDay(targetDate).toISOString();
 
@@ -87,7 +108,7 @@ export const crmService = {
 
     if (error) {
       console.error('Erro ao buscar receitas vencendo:', error);
-      throw error;
+      return [];
     }
 
     return (data as any[]).filter(v => v.cliente) as CrmVenda[];

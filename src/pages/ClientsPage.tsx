@@ -9,7 +9,7 @@ import {
   Printer,
   Users,
   Calendar,
-  Sparkles,
+  Eye,
   MapPin
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -317,6 +317,17 @@ export default function ClientsPage() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button 
+                          className="p-2 bg-primary/10 hover:bg-primary/20 rounded-lg text-primary transition-colors cursor-pointer border border-primary/20"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedClientId(client.id);
+                            setProfileModalOpen(true);
+                          }}
+                          title="Abrir Prontuário & Refração"
+                        >
+                          <Eye size={18} />
+                        </button>
                         <button 
                           className="p-2 hover:bg-white/10 rounded-lg text-white/50 hover:text-white transition-colors cursor-pointer"
                           onClick={(e) => {

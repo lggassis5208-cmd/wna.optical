@@ -36,6 +36,8 @@ import ProtectedRoute from './components/ProtectedRoute';
 import SimularImpressaoNota from './components/SimularImpressaoNota';
 import SegmentosPage from './pages/SegmentosPage';
 import CampanhasPage from './pages/CampanhasPage';
+import FichasMedicasPage from './pages/FichasMedicasPage';
+import { Eye } from 'lucide-react';
 import { notificationService } from './lib/notificationService';
 import type { AppNotification } from './lib/notificationService';
 import { openWhatsApp } from './lib/whatsappUtils';
@@ -181,6 +183,12 @@ function Layout() {
             icon={<Users size={20} />} 
             label="Clientes" 
             active={location.pathname === '/clientes'} 
+          />
+          <NavItem 
+            to="/fichas-medicas" 
+            icon={<Eye size={20} />} 
+            label="Fichas Médicas / Grau" 
+            active={location.pathname === '/fichas-medicas'} 
           />
           <NavItem 
             to="/crm" 
@@ -337,6 +345,7 @@ function App() {
         >
           <Route index element={<DashboardPage />} />
           <Route path="clientes" element={<ClientsPage />} />
+          <Route path="fichas-medicas" element={<FichasMedicasPage />} />
           <Route path="crm" element={<CrmPage />} />
           <Route path="vendas" element={<SalesPage />} />
           <Route path="agenda" element={<AgendaPage />} />

@@ -1,4 +1,5 @@
 import { toast } from 'sonner';
+import { supabase } from './supabase';
 
 /**
  * Função de limpeza e formatação de telefone para o WhatsApp.
@@ -13,12 +14,7 @@ export function formatPhoneForWhatsApp(phone: string, defaultDdd: string = '62')
 
   // Se já começa com DDI 55 (Brasil)
   if (cleaned.startsWith('55')) {
-    // 12 ou 13 dígitos: 55 + DDD (2) + Número (8 ou 9)
-    if (cleaned.length === 12 || cleaned.length === 13) {
-      return cleaned;
-    }
-    // 10 ou 11 dígitos começando com 55 (ex: 55629812345)
-    if (cleaned.length === 10 || cleaned.length === 11) {
+    if (cleaned.length === 12 || cleaned.length === 13 || cleaned.length === 10 || cleaned.length === 11) {
       return cleaned;
     }
   }
@@ -34,6 +30,15 @@ export function formatPhoneForWhatsApp(phone: string, defaultDdd: string = '62')
   }
 
   return cleaned;
+}
+
+/**
+ * Normaliza o telefone no formato estrito WAHA (55DDDNUM@c.us)
+ */
+export function formatWahaJid(phone: string): string {
+  const formatted = formatPhoneForWhatsApp(phone);
+  if (!formatted) return '';
+  return `${formatted}@c.us`;
 }
 
 /**
@@ -53,12 +58,13 @@ export function getWhatsAppLink(phone: string, message: string): string {
     return `https://web.whatsapp.com/send?phone=${formattedPhone}&text=${encodedMessage}`;
   }
 
-  // Modo padrão 'api' (api.whatsapp.com/send): Funciona tanto em desktop quanto mobile
+  // Modo padrão 'api' (api.whatsapp.com/send)
   return `https://api.whatsapp.com/send?phone=${formattedPhone}&text=${encodedMessage}`;
 }
 
 /**
  * Abre o WhatsApp em uma nova aba com notificação informativa.
+ * DISPARO SEMPRE MANUAL (O operador clica).
  */
 export function openWhatsApp(phone: string, message: string): void {
   const formatted = formatPhoneForWhatsApp(phone);
@@ -73,22 +79,43 @@ export function openWhatsApp(phone: string, message: string): void {
   if (link) {
     window.open(link, '_blank');
     toast.success('Abrindo conversa no WhatsApp...', {
-      description: 'Dica: Certifique-se de que a conta da Ótica Lìs está ativa no seu WhatsApp Web/App.'
+      description: 'Disparo manual acionado pelo operador com sucesso.'
     });
   }
 }
 
 /**
- * Copia a mensagem para a área de transferência e abre o WhatsApp.
+ * Mensagem pré-preenchida para confirmação de cadastro (Parte 4 da especificação)
  */
-export async function copyToClipboardAndOpenWhatsApp(phone: string, message: string): Promise<void> {
+export function buildConfirmacaoCadastroMsg(nomeCliente: string): string {
+  const primeiroNome = (nomeCliente || '').trim().split(' ')[0] || 'Cliente';
+  return `Olá ${primeiroNome}! Essa mensagem é uma confirmação do seu cadastro aqui conosco na Ótica Lis. Seja muito bem-vindo(a)! Qualquer dúvida sobre suas lentes ou óculos, estamos à disposição.`;
+}
+
+/**
+ * Mensagem pré-preenchida para envio de documento transacional por link (Parte 5 da especificação)
+ */
+export function buildDocumentoLinkMsg(nomeCliente: string, tipoDocLabel: string, signedUrl: string): string {
+  const primeiroNome = (nomeCliente || '').trim().split(' ')[0] || 'Cliente';
+  return `Olá ${primeiroNome}! Segue o link para visualizar o seu ${tipoDocLabel} da Ótica Lis:\n\n${signedUrl}\n\nEste é um link seguro e expira em 48 horas.`;
+}
+
+/**
+ * Verificação rápida de lista de supressão (Opt-Out / PARE)
+ */
+export async function isPhoneSuppressed(phone: string): Promise<boolean> {
+  const formatted = formatPhoneForWhatsApp(phone);
+  if (!formatted) return false;
+
   try {
-    if (navigator.clipboard && message) {
-      await navigator.clipboard.writeText(message);
-      toast.success('Mensagem copiada para a área de transferência!');
-    }
-  } catch (err) {
-    console.warn('Não foi possível copiar texto:', err);
+    const { data } = await supabase
+      .from('lista_supressao')
+      .select('id')
+      .eq('whatsapp', formatted)
+      .limit(1);
+
+    return (data && data.length > 0) || false;
+  } catch (e) {
+    return false;
   }
-  openWhatsApp(phone, message);
 }
