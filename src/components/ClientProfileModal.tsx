@@ -386,6 +386,10 @@ export default function ClientProfileModal({ isOpen, onClose, clientId }: Client
         fichaToEditId={selectedFichaId}
         fichaPaiIdForAdendo={adendoPaiId}
         onSaved={() => clientId && loadClientData(clientId)}
+        onOpenPdf={(ficha) => {
+          setSelectedPdfFicha(ficha);
+          setPdfModalOpen(true);
+        }}
       />
 
       <FichaMedicaPDF

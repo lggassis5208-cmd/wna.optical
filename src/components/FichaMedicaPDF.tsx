@@ -185,8 +185,8 @@ export default function FichaMedicaPDF({
               <span className="text-white/80 print:text-gray-800">{ficha.telefone || 'Não informado'}</span>
             </div>
             <div>
-              <span className="text-white/40 print:text-gray-500 block text-[10px] uppercase font-bold">Optometrista</span>
-              <span className="text-white/90 print:text-gray-900 font-bold">{ficha.atendido_por}</span>
+              <span className="text-white/40 print:text-gray-500 block text-[10px] uppercase font-bold">Médico / Responsável</span>
+              <span className="text-white/90 print:text-gray-900 font-bold">{ficha.atendido_por || 'Priscila Freitas CRO 3016'}</span>
             </div>
           </div>
 
@@ -287,9 +287,18 @@ export default function FichaMedicaPDF({
               </p>
             </div>
 
-            <div className="text-center w-64 border-t border-white/30 print:border-black pt-2">
-              <p className="text-xs font-bold text-white print:text-black">{ficha.atendido_por}</p>
-              <p className="text-[10px] text-white/50 print:text-gray-600">Optometrista Responsável</p>
+            <div className="text-center min-w-64 border-t border-white/30 print:border-black pt-2">
+              <p className="text-xs font-black text-white print:text-black uppercase tracking-wide">
+                {ficha.atendido_por || 'Priscila Freitas CRO 3016'}
+              </p>
+              <p className="text-[10px] text-primary print:text-gray-700 font-bold">
+                {ficha.atendido_por?.toUpperCase().includes('CRO')
+                  ? 'Médico Principal / Responsável Técnico'
+                  : 'Médico Principal & Optometrista Responsável — CRO 3016'}
+              </p>
+              <p className="text-[9px] text-white/40 print:text-gray-500 font-mono mt-0.5">
+                Ótica Lìs — Registro Clínico
+              </p>
             </div>
           </div>
 

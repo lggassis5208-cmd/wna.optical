@@ -109,7 +109,21 @@ export const fichasMedicasService = {
 
         const { data, error } = await query;
         if (!error && data) {
-          return data as FichaMedica[];
+          const fichas = data as FichaMedica[];
+          // Anexar refrações caso a query Postgres relacional direta não tenha feito o join
+          const fichasSemRefracoes = fichas.filter(f => !f.refracoes || f.refracoes.length === 0);
+          if (fichasSemRefracoes.length > 0) {
+            const ids = fichasSemRefracoes.map(f => f.id);
+            const { data: todasRefracoes } = await supabase.from('refracoes').select('*').in('ficha_id', ids);
+            if (todasRefracoes && Array.isArray(todasRefracoes)) {
+              for (const f of fichas) {
+                if (!f.refracoes || f.refracoes.length === 0) {
+                  f.refracoes = todasRefracoes.filter((r: any) => r.ficha_id === f.id);
+                }
+              }
+            }
+          }
+          return fichas;
         }
         console.warn('Erro no Supabase getFichas, usando fallback local:', error);
       } catch (e) {
@@ -145,6 +159,12 @@ export const fichasMedicasService = {
 
         if (!error && data) {
           ficha = data as FichaMedica;
+          if (!ficha.refracoes || ficha.refracoes.length === 0) {
+            const { data: refs } = await supabase.from('refracoes').select('*').eq('ficha_id', id);
+            if (refs && Array.isArray(refs)) {
+              ficha.refracoes = refs;
+            }
+          }
         }
       } catch (e) {
         console.warn('Erro ao buscar ficha por ID no Supabase:', e);

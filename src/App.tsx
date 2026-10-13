@@ -37,7 +37,8 @@ import SimularImpressaoNota from './components/SimularImpressaoNota';
 import SegmentosPage from './pages/SegmentosPage';
 import CampanhasPage from './pages/CampanhasPage';
 import FichasMedicasPage from './pages/FichasMedicasPage';
-import { Eye } from 'lucide-react';
+import RecompraPage from './pages/RecompraPage';
+import { Eye, RefreshCw } from 'lucide-react';
 import { notificationService } from './lib/notificationService';
 import type { AppNotification } from './lib/notificationService';
 import { openWhatsApp } from './lib/whatsappUtils';
@@ -189,6 +190,12 @@ function Layout() {
             icon={<Eye size={20} />} 
             label="Fichas Médicas / Grau" 
             active={location.pathname === '/fichas-medicas'} 
+          />
+          <NavItem 
+            to="/recompra" 
+            icon={<RefreshCw size={20} />} 
+            label="Painel de Recompra" 
+            active={location.pathname === '/recompra'} 
           />
           <NavItem 
             to="/crm" 
@@ -346,6 +353,7 @@ function App() {
           <Route index element={<DashboardPage />} />
           <Route path="clientes" element={<ClientsPage />} />
           <Route path="fichas-medicas" element={<FichasMedicasPage />} />
+          <Route path="recompra" element={<RecompraPage />} />
           <Route path="crm" element={<CrmPage />} />
           <Route path="vendas" element={<SalesPage />} />
           <Route path="agenda" element={<AgendaPage />} />

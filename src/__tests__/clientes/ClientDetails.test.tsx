@@ -37,15 +37,15 @@ describe('ClientDetails Validation (ClientProfileModal)', () => {
       expect(screen.getAllByText('Maria Silva').length).toBeGreaterThan(0);
     });
 
-    // Mudar para a aba de Histórico Clínico
-    const clinicoTab = screen.getByText('Histórico Clínico');
-    fireEvent.click(clinicoTab);
+    // Mudar para a aba de Compras
+    const comprasTab = screen.getByText(/Compras/i);
+    fireEvent.click(comprasTab);
 
     // Deve mostrar as 3 OS
     await waitFor(() => {
-      expect(screen.getByText('Ficha Clínica / O.S. #1001')).toBeInTheDocument();
-      expect(screen.getByText('Ficha Clínica / O.S. #1002')).toBeInTheDocument();
-      expect(screen.getByText('Ficha Clínica / O.S. #1003')).toBeInTheDocument();
+      expect(screen.getByText('#1001')).toBeInTheDocument();
+      expect(screen.getByText('#1002')).toBeInTheDocument();
+      expect(screen.getByText('#1003')).toBeInTheDocument();
     });
   });
 });

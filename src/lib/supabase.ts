@@ -1,13 +1,8 @@
-import { createClient } from '@supabase/supabase-js';
+import { neonClient, isNeonConfigured } from './neon';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'placeholder-key';
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Redireciona transparentemente todas as operações para o Neon PostgreSQL Serverless
+export const supabase: any = neonClient;
 
 export const isSupabaseConfigured = () => {
-  return Boolean(
-    import.meta.env.VITE_SUPABASE_URL && 
-    import.meta.env.VITE_SUPABASE_URL !== 'https://placeholder.supabase.co'
-  );
+  return isNeonConfigured();
 };

@@ -21,29 +21,20 @@ export const storage = {
       try {
         // Mapear campos do frontend para o schema do banco
         const row = {
-          nome: client.nome_completo || client.name || client.nome || '',
-          cpf: client.cpf || '',
+          nome_completo: client.nome_completo || client.name || client.nome || '',
+          cpf: client.cpf ? client.cpf.replace(/\D/g, '') || null : null,
           whatsapp: (client.whatsapp || '').replace(/\D/g, ''),
           data_nascimento: client.data_nascimento || null,
           lis_score: client.lis_score || 850,
           canal_origem: client.canal_origem || client.canal || 'loja_fisica',
           consentimento_marketing: client.consentimento_marketing !== false,
-          opt_in_marketing: client.consentimento_marketing !== false,
-          base_legal: client.base_legal || (client.consentimento_marketing !== false ? 'consentimento' : 'legitimo_interesse'),
-          consentimento_em: client.consentimento_em || new Date().toISOString(),
-          canal_consentimento: client.canal_consentimento || 'cadastro_loja',
-          termo_versao: client.termo_versao || 'termo_v1.2',
-          tipo: client.tipo || 'cliente',
-          status_crm: client.status_crm || 'ativo',
-          origem: client.origem || client.canal_origem || 'outro',
-          consentimento_saude: Boolean(client.consentimento_saude),
           temperatura: client.temperatura || 'frio',
           cep: client.cep || '00000000',
           logradouro: client.logradouro || null,
           numero: client.numero || null,
           bairro: client.bairro || null,
           cidade: client.cidade || null,
-          estado: client.estado || null,
+          estado: client.estado || client.uf || null,
           email: client.email || null,
           rg: client.rg || null
         };

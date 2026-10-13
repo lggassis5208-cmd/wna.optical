@@ -280,6 +280,10 @@ export default function FichasMedicasPage() {
         fichaToEditId={selectedFichaToEdit}
         fichaPaiIdForAdendo={fichaPaiForAdendo}
         onSaved={fetchFichas}
+        onOpenPdf={(ficha) => {
+          setSelectedFichaForPdf(ficha);
+          setIsPdfModalOpen(true);
+        }}
       />
 
       <FichaMedicaPDF

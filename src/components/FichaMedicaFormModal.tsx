@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   X, 
   Save, 
@@ -12,12 +12,17 @@ import {
   Eye,
   Calendar,
   Sparkles,
-  Info
+  Info,
+  Search,
+  Printer
 } from 'lucide-react';
 import { fichasMedicasService, type FichaMedica, type Refracao } from '../lib/services/fichasMedicasService';
+import { storage } from '../lib/storage';
 import { validateRefractionClinical } from '../lib/cryptoUtils';
 import { formatDate } from '../lib/dateUtils';
 import { toast } from 'sonner';
+
+export const MEDICO_PRINCIPAL_DEFAULT = 'Priscila Freitas CRO 3016';
 
 interface FichaMedicaFormModalProps {
   isOpen: boolean;
@@ -27,6 +32,7 @@ interface FichaMedicaFormModalProps {
   fichaToEditId?: string | null;
   fichaPaiIdForAdendo?: string | null;
   onSaved?: () => void;
+  onOpenPdf?: (ficha: FichaMedica) => void;
 }
 
 export default function FichaMedicaFormModal({
@@ -36,7 +42,8 @@ export default function FichaMedicaFormModal({
   clientData,
   fichaToEditId,
   fichaPaiIdForAdendo,
-  onSaved
+  onSaved,
+  onOpenPdf
 }: FichaMedicaFormModalProps) {
   const [fichaId, setFichaId] = useState<string | null>(fichaToEditId || null);
   const [loading, setLoading] = useState(false);
@@ -45,6 +52,13 @@ export default function FichaMedicaFormModal({
   const [assinaturaHash, setAssinaturaHash] = useState<string | null>(null);
   const [showHistoryCompare, setShowHistoryCompare] = useState(false);
   const [previousFichas, setPreviousFichas] = useState<FichaMedica[]>([]);
+  const [currentFichaObj, setCurrentFichaObj] = useState<FichaMedica | null>(null);
+
+  // Vinculação e busca de pacientes do ERP
+  const [selectedClienteId, setSelectedClienteId] = useState<string | null>(clienteId || clientData?.id || null);
+  const [allClients, setAllClients] = useState<any[]>([]);
+  const [showClientDropdown, setShowClientDropdown] = useState(false);
+  const clientDropdownRef = useRef<HTMLDivElement>(null);
 
   // Dados do Paciente
   const [nome, setNome] = useState('');
@@ -55,7 +69,7 @@ export default function FichaMedicaFormModal({
 
   // Dados da Consulta
   const [motivoConsulta, setMotivoConsulta] = useState('');
-  const [atendidoPor, setAtendidoPor] = useState('Dr. Optometrista Lìs');
+  const [atendidoPor, setAtendidoPor] = useState(MEDICO_PRINCIPAL_DEFAULT);
   const [dataExame, setDataExame] = useState(new Date().toISOString().substring(0, 10));
   const [validadeReceita, setValidadeReceita] = useState('');
 
@@ -85,6 +99,17 @@ export default function FichaMedicaFormModal({
   const odValidation = validateRefractionClinical(od);
   const oeValidation = validateRefractionClinical(oe);
 
+  // Fecha dropdown ao clicar fora
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (clientDropdownRef.current && !clientDropdownRef.current.contains(e.target as Node)) {
+        setShowClientDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   useEffect(() => {
     if (isOpen) {
       initModal();
@@ -104,6 +129,13 @@ export default function FichaMedicaFormModal({
   const initModal = async () => {
     setLoading(true);
     try {
+      // Carregar lista de clientes do ERP para busca
+      const clientsList = await storage.getClients();
+      setAllClients(clientsList || []);
+
+      const initialCid = clienteId || clientData?.id || null;
+      setSelectedClienteId(initialCid);
+
       // 1. Preencher com dados do cliente se fornecido
       if (clientData) {
         setNome(clientData.nome || clientData.name || clientData.nome_completo || '');
@@ -118,11 +150,10 @@ export default function FichaMedicaFormModal({
       defaultValid.setFullYear(defaultValid.getFullYear() + 1);
       setValidadeReceita(defaultValid.toISOString().substring(0, 10));
 
-      const cid = clienteId || clientData?.id;
-      if (cid) {
+      if (initialCid) {
         // Carregar fichas anteriores para historico
-        const history = await fichasMedicasService.getFichas({ clienteId: cid });
-        setPreviousFichas(history);
+        const history = await fichasMedicasService.getFichas({ clienteId: initialCid });
+        setPreviousFichas(history || []);
       }
 
       // 2. Se for edição de ficha existente
@@ -130,13 +161,15 @@ export default function FichaMedicaFormModal({
         const f = await fichasMedicasService.getFichaById(fichaToEditId, 'Sistema Lìs ERP');
         if (f) {
           setFichaId(f.id);
+          setCurrentFichaObj(f);
+          setSelectedClienteId(f.cliente_id || null);
           setNome(f.nome || '');
           setCpf(f.cpf || '');
           setTelefone(f.telefone || '');
           setGenero(f.genero || 'Outro');
           setDataNascimento(f.data_nascimento || '');
           setMotivoConsulta(f.motivo_consulta || '');
-          setAtendidoPor(f.atendido_por || 'Dr. Optometrista Lìs');
+          setAtendidoPor(f.atendido_por || MEDICO_PRINCIPAL_DEFAULT);
           setDataExame(f.data_exame || new Date().toISOString().substring(0, 10));
           setValidadeReceita(f.validade_receita || '');
           setIsFinalized(f.status === 'finalizada');
@@ -156,7 +189,10 @@ export default function FichaMedicaFormModal({
         if (fPai) {
           setIsAdendo(true);
           setFichaId(null);
+          setCurrentFichaObj(null);
+          setSelectedClienteId(fPai.cliente_id || null);
           setIsFinalized(false);
+          setAtendidoPor(fPai.atendido_por || MEDICO_PRINCIPAL_DEFAULT);
           setMotivoConsulta(`Retificação / Adendo referente à ficha #${fPai.id.substring(0, 8)}`);
           if (fPai.refracoes) {
             const rod = fPai.refracoes.find(r => r.olho === 'OD');
@@ -168,9 +204,11 @@ export default function FichaMedicaFormModal({
       } else {
         // Nova Ficha do Zero
         setFichaId(null);
+        setCurrentFichaObj(null);
         setIsFinalized(false);
         setAssinaturaHash(null);
         setIsAdendo(false);
+        setAtendidoPor(MEDICO_PRINCIPAL_DEFAULT);
       }
     } catch (e) {
       toast.error('Erro ao inicializar formulário de prontuário.');
@@ -178,6 +216,85 @@ export default function FichaMedicaFormModal({
       setLoading(false);
     }
   };
+
+  // Seleciona um cliente existente do ERP
+  const handleSelectClient = async (c: any) => {
+    setSelectedClienteId(c.id);
+    setNome(c.nome_completo || c.nome || '');
+    setCpf(c.cpf || '');
+    setTelefone(c.whatsapp || c.telefone || '');
+    setGenero(c.genero || 'Outro');
+    setDataNascimento(c.data_nascimento || '');
+    setShowClientDropdown(false);
+
+    try {
+      const history = await fichasMedicasService.getFichas({ clienteId: c.id });
+      setPreviousFichas(history || []);
+    } catch {
+      setPreviousFichas([]);
+    }
+  };
+
+  // Garante que a ficha esteja vinculada a um cliente_id no banco (cria se for novo)
+  const ensureClienteId = async (): Promise<string> => {
+    if (selectedClienteId) return selectedClienteId;
+    if (clienteId) return clienteId;
+    if (clientData?.id) return clientData.id;
+
+    if (!nome.trim()) {
+      throw new Error('Informe o Nome Completo do paciente.');
+    }
+
+    const cleanCpf = cpf ? cpf.replace(/\D/g, '') : '';
+    const cleanPhone = telefone ? telefone.replace(/\D/g, '') : '';
+
+    // 1. Tentar localizar cliente por CPF ou Nome
+    let matched = null;
+    if (cleanCpf) {
+      matched = allClients.find((c: any) => c.cpf && c.cpf.replace(/\D/g, '') === cleanCpf);
+    }
+    if (!matched && nome.trim()) {
+      matched = allClients.find((c: any) => (c.nome_completo || c.nome || '').trim().toLowerCase() === nome.trim().toLowerCase());
+    }
+
+    if (matched && matched.id) {
+      setSelectedClienteId(matched.id);
+      return matched.id;
+    }
+
+    // 2. Criar novo cliente automaticamente no ERP
+    const newClientPayload = {
+      nome: nome.trim(),
+      nome_completo: nome.trim(),
+      cpf: cleanCpf || null,
+      whatsapp: cleanPhone || '00000000000',
+      data_nascimento: dataNascimento || null,
+      genero: genero || 'Outro',
+      tipo: 'cliente',
+      status_crm: 'ativo'
+    };
+
+    const saved = await storage.saveClient(newClientPayload);
+    const newId = saved?.id;
+    if (newId) {
+      setSelectedClienteId(newId);
+      setAllClients(prev => [...prev, saved]);
+      toast.success(`Paciente "${nome.trim()}" cadastrado e vinculado ao ERP!`);
+      return newId;
+    }
+
+    throw new Error('Não foi possível vincular ou cadastrar o paciente no ERP.');
+  };
+
+  // Clientes filtrados para o auto-complete
+  const filteredClients = allClients.filter(c => {
+    const term = nome.toLowerCase().trim();
+    if (!term) return true;
+    const clientName = (c.nome_completo || c.nome || '').toLowerCase();
+    const clientCpf = (c.cpf || '').replace(/\D/g, '');
+    const clientPhone = (c.whatsapp || c.telefone || '').replace(/\D/g, '');
+    return clientName.includes(term) || clientCpf.includes(term) || clientPhone.includes(term);
+  });
 
   // Repetir valores da última refração cadastrada do cliente
   const handleRepetirUltimaRefracao = () => {
@@ -199,18 +316,21 @@ export default function FichaMedicaFormModal({
 
   // Salvar Rascunho
   const handleSaveRascunho = async () => {
-    if (!clienteId && !clientData?.id) {
-      return toast.error('Vincule a ficha a um cliente/paciente do ERP.');
+    if (!nome.trim()) {
+      return toast.error('Informe o Nome Completo do paciente.');
     }
     if (!dataExame) {
       return toast.error('A Data do Exame é obrigatória.');
     }
 
     try {
+      setLoading(true);
+      const cid = await ensureClienteId();
+
       const saved = await fichasMedicasService.saveRascunho(
         {
           id: fichaId || undefined,
-          cliente_id: clienteId || clientData?.id,
+          cliente_id: cid,
           nome,
           cpf,
           telefone,
@@ -229,13 +349,18 @@ export default function FichaMedicaFormModal({
       setFichaId(saved.id);
       toast.success('Rascunho de Prontuário salvo com sucesso.');
       if (onSaved) onSaved();
-    } catch (e) {
-      toast.error('Erro ao salvar rascunho de prontuário.');
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao salvar rascunho de prontuário.');
+    } finally {
+      setLoading(false);
     }
   };
 
   // Finalizar Prontuário
   const handleFinalizar = async () => {
+    if (!nome.trim()) {
+      return toast.error('Informe o Nome Completo do paciente.');
+    }
     if (!odValidation.isValid || !oeValidation.isValid) {
       return toast.error('Corrija os erros de validação clínica antes de finalizar.');
     }
@@ -246,19 +371,14 @@ export default function FichaMedicaFormModal({
       return toast.error('A Data do Exame é obrigatória.');
     }
 
-    const cid = clienteId || clientData?.id;
-    if (!cid) {
-      return toast.error('Vincule a ficha a um paciente do ERP.');
-    }
-
     try {
       setLoading(true);
-      const targetId = fichaId || crypto.randomUUID();
+      const cid = await ensureClienteId();
+      const targetId = fichaId || (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9));
       const finalized = await fichasMedicasService.finalizarFicha(
         targetId,
         atendidoPor,
         {
-          id: targetId,
           cliente_id: cid,
           nome,
           cpf,
@@ -275,15 +395,20 @@ export default function FichaMedicaFormModal({
         od,
         oe
       );
-
+      setFichaId(finalized.id);
       setIsFinalized(true);
+      setCurrentFichaObj(finalized);
       setAssinaturaHash(finalized.assinatura_hash || null);
-      toast.success('Prontuário Médico Finalizado & Assinado com sucesso!', {
-        description: `Hash de imutabilidade gerado: ${finalized.assinatura_hash?.substring(0, 20)}...`
-      });
+      toast.success('Prontuário Médico finalizado e vinculado com sucesso!');
       if (onSaved) onSaved();
+
+      // Abrir o documento PDF automaticamente após a criação/finalização
+      if (onOpenPdf) {
+        onClose();
+        onOpenPdf(finalized);
+      }
     } catch (e: any) {
-      toast.error('Erro ao finalizar prontuário: ' + (e?.message || 'Falha de gravação'));
+      toast.error(e.message || 'Erro ao finalizar e assinar prontuário.');
     } finally {
       setLoading(false);
     }
@@ -433,16 +558,71 @@ export default function FichaMedicaFormModal({
               <UserCheck size={16} /> 1. Dados Pessoais do Paciente (ERP)
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-[11px] font-bold text-white/60 mb-1">Nome Completo</label>
-                <input 
-                  type="text" 
-                  disabled={isFinalized}
-                  value={nome}
-                  onChange={(e) => setNome(e.target.value)}
-                  placeholder="Nome do cliente"
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:border-primary focus:outline-none disabled:opacity-50"
-                />
+              <div className="relative" ref={clientDropdownRef}>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="block text-[11px] font-bold text-white/60">
+                    Nome Completo *
+                  </label>
+                  {selectedClienteId && (
+                    <span className="text-[10px] text-green-400 font-bold flex items-center gap-1">
+                      <CheckCircle size={10} /> Vinculado ao ERP
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <input 
+                    type="text" 
+                    disabled={isFinalized}
+                    value={nome}
+                    onChange={(e) => {
+                      setNome(e.target.value);
+                      setShowClientDropdown(true);
+                    }}
+                    onFocus={() => {
+                      if (!isFinalized && allClients.length > 0) setShowClientDropdown(true);
+                    }}
+                    placeholder="Busque ou digite o nome do cliente..."
+                    className="w-full bg-white/5 border border-white/10 rounded-xl pl-3 pr-8 py-2 text-sm text-white focus:border-primary focus:outline-none disabled:opacity-50"
+                  />
+                  {!isFinalized && (
+                    <Search size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
+                  )}
+                </div>
+
+                {/* Dropdown com sugestões de clientes do ERP */}
+                {showClientDropdown && !isFinalized && (
+                  <div className="absolute left-0 right-0 top-full mt-1 bg-[#1A1A1E] border border-white/10 rounded-xl shadow-2xl z-50 max-h-56 overflow-y-auto custom-scrollbar">
+                    {filteredClients.length > 0 ? (
+                      filteredClients.map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => handleSelectClient(c)}
+                          className="w-full p-3 text-left hover:bg-white/5 border-b border-white/5 flex items-center justify-between transition-colors"
+                        >
+                          <div>
+                            <p className="text-xs font-bold text-white">{c.nome_completo || c.nome}</p>
+                            <p className="text-[10px] text-white/50 font-mono">
+                              {c.cpf ? `CPF: ${c.cpf}` : ''} {c.whatsapp ? `• Whats: ${c.whatsapp}` : ''}
+                            </p>
+                          </div>
+                          <span className="text-[10px] bg-primary/10 text-primary font-bold px-2 py-0.5 rounded-md border border-primary/20">
+                            Selecionar
+                          </span>
+                        </button>
+                      ))
+                    ) : (
+                      <div className="p-3 text-center">
+                        <p className="text-xs text-white/60">
+                          Nenhum cliente cadastrado com "{nome}"
+                        </p>
+                        <p className="text-[10px] text-primary mt-1 font-bold">
+                          + Novo paciente será criado automaticamente ao salvar
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div>
@@ -686,15 +866,41 @@ export default function FichaMedicaFormModal({
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="block text-[11px] font-bold text-white/60 mb-1">Optometrista Responsável *</label>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="block text-[11px] font-bold text-white/60">Médico / Optometrista Responsável *</label>
+                  {!isFinalized && atendidoPor !== MEDICO_PRINCIPAL_DEFAULT && (
+                    <button
+                      type="button"
+                      onClick={() => setAtendidoPor(MEDICO_PRINCIPAL_DEFAULT)}
+                      className="text-[10px] text-primary hover:underline font-bold"
+                    >
+                      Padrão
+                    </button>
+                  )}
+                </div>
                 <input 
                   type="text" 
                   disabled={isFinalized}
                   value={atendidoPor}
                   onChange={(e) => setAtendidoPor(e.target.value)}
-                  placeholder="Nome do Optometrista"
+                  placeholder="Nome do Médico / Optometrista"
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:border-primary focus:outline-none disabled:opacity-50 font-bold"
                 />
+                <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[10px] text-white/40">Médico Principal:</span>
+                  <button
+                    type="button"
+                    disabled={isFinalized}
+                    onClick={() => setAtendidoPor(MEDICO_PRINCIPAL_DEFAULT)}
+                    className={`text-[10px] px-2.5 py-0.5 rounded-md font-bold transition-all border flex items-center gap-1 ${
+                      atendidoPor === MEDICO_PRINCIPAL_DEFAULT
+                        ? 'bg-primary/20 text-primary border-primary/40 shadow-sm'
+                        : 'bg-white/5 text-white/60 border-white/10 hover:text-white'
+                    }`}
+                  >
+                    ⭐ Priscila Freitas CRO 3016
+                  </button>
+                </div>
               </div>
 
               <div>
@@ -759,17 +965,31 @@ export default function FichaMedicaFormModal({
                   disabled={loading}
                   className="px-6 py-2.5 bg-green-600 hover:bg-green-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-lg shadow-green-500/20 flex items-center gap-2"
                 >
-                  <CheckCircle size={16} /> Finalizar Prontuário & Assinar
+                  <Printer size={16} /> Finalizar & Gerar PDF
                 </button>
               </>
             ) : (
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-6 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition-all"
-              >
-                Fechar Prontuário
-              </button>
+              <div className="flex items-center gap-2">
+                {onOpenPdf && currentFichaObj && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenPdf(currentFichaObj);
+                    }}
+                    className="px-5 py-2.5 bg-primary hover:bg-primary/90 text-black font-black uppercase tracking-wider rounded-xl text-xs transition-all flex items-center gap-2 shadow-lg shadow-primary/20"
+                  >
+                    <Printer size={16} /> Visualizar / Imprimir PDF
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-5 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition-all"
+                >
+                  Fechar Prontuário
+                </button>
+              </div>
             )}
           </div>
         </div>

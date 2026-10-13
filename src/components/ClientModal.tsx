@@ -90,6 +90,7 @@ export default function ClientModal({ isOpen, onClose }: ClientModalProps) {
       // Garantir prefixo 55 e apenas números ao salvar
       const cleanData = {
         ...formData,
+        cep: cep || '00000000',
         whatsapp: formatPhoneForWhatsApp(formData.whatsapp)
       };
       
