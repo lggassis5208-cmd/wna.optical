@@ -297,11 +297,6 @@ function Layout() {
           </div>
           <div className="flex items-center gap-4">
             <NotificationBell />
-            <div className="h-8 w-px bg-white/10 mx-2"></div>
-            <div className="text-right">
-              <p className="text-xs text-white/40">Sábado, 14 de Março</p>
-              <p className="text-sm font-semibold">11:00</p>
-            </div>
           </div>
         </header>
 
