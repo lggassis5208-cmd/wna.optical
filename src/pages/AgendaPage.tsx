@@ -45,12 +45,12 @@ export default function AgendaPage() {
     setLoading(true);
     setErrorMessage(null);
     try {
-      // Busca agendamentos direto do Supabase via agendaService (sem fallback silencioso)
+      // Busca agendamentos direto do banco via agendaService
       const data = await agendaService.buscarAgendamentos();
       setExames(data);
     } catch (e: any) {
       console.error('Erro de busca no AgendaPage:', e);
-      setErrorMessage(e.message || 'Erro de conexão com o Supabase ao carregar agenda.');
+      setErrorMessage(e.message || 'Erro de conexão ao carregar agenda.');
       toast.error(e.message || 'Não foi possível carregar os agendamentos do servidor.');
     } finally {
       setLoading(false);
@@ -317,7 +317,7 @@ export default function AgendaPage() {
         {loading ? (
           <div className="h-full flex flex-col items-center justify-center gap-3 text-white/50">
             <Loader2 className="animate-spin text-primary" size={40} />
-            <p className="text-sm font-bold tracking-widest uppercase">Carregando Agenda do Supabase...</p>
+            <p className="text-sm font-bold tracking-widest uppercase">Carregando Agenda...</p>
           </div>
         ) : errorMessage ? (
           <div className="h-full flex flex-col items-center justify-center gap-4 p-8 text-center max-w-md mx-auto">
@@ -878,12 +878,12 @@ function AgendamentoModalV2({ isOpen, onClose, onSaveSuccess }: { isOpen: boolea
         observacoes: formData.observacoes || undefined
       });
 
-      toast.success('Agendamento salvo no Supabase com sucesso!');
+      toast.success('Agendamento salvo com sucesso!');
       onSaveSuccess();
       onClose();
     } catch (e: any) {
       console.error(e);
-      toast.error(e.message || 'Erro ao salvar agendamento no Supabase.');
+      toast.error(e.message || 'Erro ao salvar agendamento.');
     } finally {
       setLoading(false);
     }

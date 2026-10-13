@@ -210,7 +210,7 @@ export default function ClientsPage() {
           <div>
             <p className="text-xs font-semibold uppercase text-white/40 tracking-wider">Status da Base</p>
             <p className="text-2xl font-black text-white">Sincronizado</p>
-            <p className="text-[11px] text-green-400 font-medium">Banco de Dados Supabase OK</p>
+            <p className="text-[11px] text-green-400 font-medium">Banco de Dados PostgreSQL OK</p>
           </div>
         </div>
       </div>

@@ -171,7 +171,7 @@ export default function RelatorioCaixaModal({ isOpen, onClose, caixa, movimentos
                 Relatório de Auditoria e Fechamento de Caixa
               </h3>
               <p className="text-xs text-white/50 font-medium">
-                Sincronizado com os lançamentos em tempo real do Supabase
+                Sincronizado com os lançamentos em tempo real do banco de dados
               </p>
             </div>
           </div>
