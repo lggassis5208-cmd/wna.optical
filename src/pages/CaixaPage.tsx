@@ -12,7 +12,6 @@ import {
   AlertTriangle,
   Calendar
 } from 'lucide-react';
-import { storage } from '../lib/storage';
 import { caixaService, type Caixa } from '../lib/services/caixaService';
 import { movimentosService } from '../lib/services/movimentosService';
 import { toast } from 'sonner';
@@ -22,8 +21,17 @@ import RelatorioCaixaModal from '../components/RelatorioCaixaModal';
 import { categoriasService, type Categoria } from '../lib/services/categoriasService';
 import { Plus } from 'lucide-react';
 
-// Mock temporário para usuário (substituir por auth.user)
-const mockUsuarioId = '00000000-0000-0000-0000-000000000000';
+// Usuário logado ou fallback
+const getUsuarioIdAtual = () => {
+  try {
+    const userStr = localStorage.getItem('lis_auth_user');
+    if (userStr) {
+      const u = JSON.parse(userStr);
+      if (u.id) return u.id;
+    }
+  } catch {}
+  return '00000000-0000-0000-0000-000000000000';
+};
 
 export default function CaixaPage() {
   const [caixaAtivo, setCaixaAtivo] = useState<Caixa | null>(null);
@@ -78,9 +86,13 @@ export default function CaixaPage() {
   }, []);
 
   const handleAbrirCaixa = async () => {
+    const valorStr = prompt('Informe o valor inicial / fundo de troco em caixa (R$):', '0.00');
+    if (valorStr === null) return;
+    const valorInicial = parseFloat(valorStr.replace(',', '.')) || 0;
+
     try {
-      await caixaService.abrirCaixa(0.01, mockUsuarioId);
-      toast.success('Caixa aberto com sucesso com R$ 0,01!');
+      await caixaService.abrirCaixa(valorInicial, getUsuarioIdAtual());
+      toast.success(`Caixa aberto com sucesso com R$ ${valorInicial.toFixed(2)}!`);
       carregarCaixa();
     } catch (e: any) {
       toast.error(e.message || 'Erro ao abrir o caixa.');
@@ -94,7 +106,7 @@ export default function CaixaPage() {
     
     if (confirm(`Deseja realmente fechar o caixa?\n\nSaldo Esperado: R$ ${saldoAtual().toFixed(2)}\nValor Contado: R$ ${Number(valorContado).toFixed(2)}`)) {
       try {
-        await caixaService.fecharCaixa(caixaAtivo.id, Number(valorContado), saldoAtual(), mockUsuarioId);
+        await caixaService.fecharCaixa(caixaAtivo.id, Number(valorContado), saldoAtual(), getUsuarioIdAtual());
         toast.success('Caixa fechado com sucesso!');
         carregarCaixa();
       } catch (e: any) {
@@ -115,7 +127,7 @@ export default function CaixaPage() {
         descricao: novaSaida.descricao,
         valor: Number(novaSaida.valor),
         forma_pagamento: novaSaida.forma,
-        usuario_id: mockUsuarioId,
+        usuario_id: getUsuarioIdAtual(),
         categoria_id: novaSaida.categoria_id || null
       });
       toast.success('Saída registrada com sucesso!');
@@ -139,7 +151,7 @@ export default function CaixaPage() {
         descricao: novaEntrada.descricao,
         valor: Number(novaEntrada.valor),
         forma_pagamento: novaEntrada.forma,
-        usuario_id: mockUsuarioId,
+        usuario_id: getUsuarioIdAtual(),
         categoria_id: novaEntrada.categoria_id || null
       });
       toast.success('Entrada avulsa registrada com sucesso!');

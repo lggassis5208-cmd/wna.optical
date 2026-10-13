@@ -186,7 +186,7 @@ function neonDevApiPlugin() {
                 if (result[0]) inserted.push(result[0]);
               }
               res.statusCode = 200;
-              return res.end(JSON.stringify({ data: inserted, error: null }));
+              return res.end(JSON.stringify({ data: single ? (inserted[0] || null) : inserted, error: null }));
             }
 
             if (action === 'upsert') {
@@ -236,7 +236,7 @@ function neonDevApiPlugin() {
               query += ` RETURNING *;`;
               const rows = await sql.query(query, values);
               res.statusCode = 200;
-              return res.end(JSON.stringify({ data: rows, error: null }));
+              return res.end(JSON.stringify({ data: single ? (rows[0] || null) : rows, error: null }));
             }
 
             if (action === 'delete') {

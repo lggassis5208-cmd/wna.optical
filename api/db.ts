@@ -143,6 +143,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
 
+      if (single) {
+        return res.status(200).json({ data: insertedRows[0] || null, error: null });
+      }
       return res.status(200).json({ data: insertedRows, error: null });
     }
 
@@ -180,6 +183,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       query += ` RETURNING *;`;
       const rows = await sql.query(query, values);
+      if (single) {
+        return res.status(200).json({ data: rows[0] || null, error: null });
+      }
       return res.status(200).json({ data: rows, error: null });
     }
 

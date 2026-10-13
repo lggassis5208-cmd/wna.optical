@@ -18,7 +18,11 @@ class QueryBuilder {
   }
 
   select(columns: string = '*', options?: { count?: 'exact' | 'planned' | 'estimated'; head?: boolean }) {
-    this.action = 'select';
+    // Se a ação já foi definida (insert, update, upsert, delete), não sobrescreve para select
+    // pois no Supabase .select() é encadeado para retornar as linhas afetadas (RETURNING *)
+    if (this.action === 'select') {
+      this.action = 'select';
+    }
     return this;
   }
 
@@ -148,6 +152,10 @@ class QueryBuilder {
       if (!response.ok && !result.error) {
         const errorResult = { data: null, error: { message: result.error || 'Erro na requisição' } };
         return onfulfilled ? onfulfilled(errorResult) : (errorResult as any);
+      }
+
+      if (this.isSingle && Array.isArray(result?.data)) {
+        result.data = result.data.length > 0 ? result.data[0] : null;
       }
 
       return onfulfilled ? onfulfilled(result) : (result as any);
