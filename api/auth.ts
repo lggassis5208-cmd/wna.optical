@@ -3,7 +3,7 @@ import { Pool } from 'pg';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
-const connectionString = process.env.DATABASE_URL || '';
+const connectionString = process.env.DATABASE_URL || 'postgresql://oticalis_user:GKbUpiE3xH7l0aU7yH5y2yPq6OL6Wq1C@dpg-db53grl9fdbs73bg2nsg-a.ohio-postgres.render.com/oticalis?sslmode=require';
 const JWT_SECRET = process.env.JWT_SECRET || 'oticalis-neon-jwt-secret-2026';
 
 let pool: Pool | null = null;

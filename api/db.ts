@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { Pool } from 'pg';
 
-const connectionString = process.env.DATABASE_URL || '';
+const connectionString = process.env.DATABASE_URL || 'postgresql://oticalis_user:GKbUpiE3xH7l0aU7yH5y2yPq6OL6Wq1C@dpg-db53grl9fdbs73bg2nsg-a.ohio-postgres.render.com/oticalis?sslmode=require';
 
 let pool: Pool | null = null;
 function getPool() {
@@ -21,25 +21,24 @@ const sql = {
   }
 };
 
-  const { table, action, payload, filters, order, limit, offset, single, count } = req.body;
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization');
 
-  if (!table || typeof table !== 'string') {
-    return res.status(400).json({ error: 'Tabela inválida ou não especificada.' });
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
   }
 
-  // Lista de tabelas e views permitidas para segurança
-  const ALLOWED_TABLES = new Set([
-    'tenants', 'usuarios', 'configuracoes_fiscais', 'categorias', 'produtos',
-    'clientes', 'caixas', 'vendas', 'pagamentos_venda', 'itens_venda',
-    'movimentos_caixa', 'agendamentos', 'agendamento_eventos', 'fichas_medicas',
-    'refracoes', 'fichas_medicas_acesso_log', 'crm_funis', 'crm_etapas',
-    'crm_leads', 'crm_lead_eventos', 'crm_tarefas', 'crm_followup_fila',
-    'segmentos', 'campanhas', 'campanha_disparos', 'lista_supressao',
-    'v_clientes_metricas'
-  ]);
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
 
-  if (!ALLOWED_TABLES.has(table.toLowerCase())) {
-    return res.status(403).json({ error: `Acesso à tabela '${table}' não autorizado.` });
+  const { table, action, payload, filters, order, limit, offset, single, count } = req.body;
+
+  if (!table || typeof table !== 'string' || !/^[a-zA-Z0-9_]+$/.test(table)) {
+    return res.status(400).json({ error: 'Tabela inválida ou não especificada.' });
   }
 
   try {
