@@ -229,7 +229,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           origem: 'whatsapp',
           estagio: 'novo',
           opt_in_marketing: false, // Inicia sem opt-in ativo de marketing
-          base_legal: 'legitimo_interesse', -- permite apenas resposta inicial
+          base_legal: 'legitimo_interesse', // permite apenas resposta inicial
           canal_consentimento: 'cadastro_loja',
           termo_versao: 'termo_v1.2',
           consentimento_em: new Date().toISOString(),

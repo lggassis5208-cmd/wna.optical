@@ -57,19 +57,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const xmlBase = gerarXMLNfe(sale, settings, modelo);
 
     // 4. Assinar Digitalmente o XML usando xml-crypto
-    const sig = new SignedXml();
-    sig.addReference(
-      `//*[@Id]`,
-      [
+    const sig: any = new SignedXml({
+      privateKey,
+      publicCert: certificate,
+      signatureAlgorithm: SIGNATURE_ALGORITHMS.signature as any,
+      canonicalizationAlgorithm: SIGNATURE_ALGORITHMS.canonicalization as any
+    });
+
+    sig.addReference({
+      xpath: `//*[@Id]`,
+      transforms: [
         'http://www.w3.org/2000/09/xmldsig#enveloped-signature',
         'http://www.w3.org/TR/2001/REC-xml-c14n-20010315'
       ],
-      SIGNATURE_ALGORITHMS.digest,
-      '',
-      '',
-      '',
-      true
-    );
+      digestAlgorithm: SIGNATURE_ALGORITHMS.digest,
+      isEmptyUri: true
+    });
 
     sig.signingKey = privateKey;
     sig.signatureAlgorithm = SIGNATURE_ALGORITHMS.signature;
