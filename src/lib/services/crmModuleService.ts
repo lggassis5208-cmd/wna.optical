@@ -239,16 +239,21 @@ export const crmModuleService = {
 
       const etapas = etapasData || [];
 
-      return funisData.map(funil => ({
+      return funisData.map((funil: CrmFunil) => ({
         ...funil,
-        etapas: etapas.filter(e => e.funil_id === funil.id)
+        etapas: etapas.filter((e: CrmEtapa) => e.funil_id === funil.id)
       }));
-    } catch (e) {
+    } catch {
       return FUNIS_PADRAO_SEED;
     }
   },
 
-  async getLeadsByFunil(funilId: string, origemFilter?: string, searchTerm?: string): Promise<CrmLead[]> {
+  async getLeadsByFunil(
+    funilId: string, 
+    origemFilter?: string, 
+    searchTerm?: string, 
+    dispararRegras: boolean = false
+  ): Promise<CrmLead[]> {
     try {
       let query = supabase
         .from('crm_leads')
@@ -273,8 +278,10 @@ export const crmModuleService = {
         if (local.length > 0) leads = local;
       }
 
-      // Executar regras automáticas de tarefas (em background)
-      this.executarRegrasTarefasAutomaticas().catch(console.error);
+      // Regras automáticas são executadas de forma controlada (ex: na lista de tarefas ou com flag explícita), evitando recursão infinita
+      if (dispararRegras) {
+        this.executarRegrasTarefasAutomaticas().catch(console.error);
+      }
 
       if (searchTerm && searchTerm.trim()) {
         const term = searchTerm.toLowerCase();

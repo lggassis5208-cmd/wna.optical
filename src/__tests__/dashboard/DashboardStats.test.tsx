@@ -4,14 +4,17 @@ import { MemoryRouter } from 'react-router-dom';
 import DashboardPage from '../../pages/DashboardPage';
 
 // Precisamos mockar os gráficos (Recharts) porque eles dão erro no JSDOM
-vi.mock('recharts', () => {
-  const OriginalRechartsModule = vi.importActual('recharts');
-  return {
-    ...OriginalRechartsModule,
-    ResponsiveContainer: ({ children }: any) => <div>{children}</div>,
+vi.mock('recharts', () => ({
+  ResponsiveContainer: ({ children }: any) => <div data-testid="responsive-container">{children}</div>,
     LineChart: () => <div>LineChart</div>,
     PieChart: () => <div>PieChart</div>,
-    BarChart: ({ children }: any) => <div>{children}</div>,
+    BarChart: ({ children }: any) => (
+      <div data-testid="bar-chart">
+        {Array.isArray(children) 
+          ? children.map((child: any, idx: number) => <div key={idx}>{child}</div>) 
+          : children}
+      </div>
+    ),
     Bar: () => <div>Bar</div>,
     CartesianGrid: () => <div>CartesianGrid</div>,
     XAxis: () => <div>XAxis</div>,
@@ -19,8 +22,7 @@ vi.mock('recharts', () => {
     Tooltip: () => <div>Tooltip</div>,
     Pie: () => <div>Pie</div>,
     Cell: () => <div>Cell</div>,
-  };
-});
+}));
 
 // Mock da storage para simular a resposta de "vendas de hoje"
 vi.mock('../../lib/storage', () => ({
