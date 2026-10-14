@@ -15,6 +15,14 @@ export const getEffectiveAddress = (dateStr?: string) => {
   return "Av Anápolis Qd 03 Lt 01 - Vila Concórdia";
 };
 
+// Cache em memória de curta duração para evitar requisições repetidas
+let clientsCache: { data: any[]; timestamp: number } | null = null;
+let salesCache: { data: any[]; timestamp: number } | null = null;
+const CACHE_TTL_MS = 45000; // 45 segundos
+
+export const invalidateClientsCache = () => { clientsCache = null; };
+export const invalidateSalesCache = () => { salesCache = null; };
+
 export const storage = {
   async saveClient(client: any) {
     if (isSupabaseConfigured()) {
@@ -39,6 +47,7 @@ export const storage = {
           rg: client.rg || null
         };
         const { data, error } = await supabase.from('clientes').insert([row]).select();
+        invalidateClientsCache();
         if (!error && data) return data[0];
         console.warn('Supabase insert error', error);
       } catch (e) {
@@ -57,10 +66,61 @@ export const storage = {
     };
     clients.push(newClient);
     localStorage.setItem('lis_clientes', JSON.stringify(clients));
+    invalidateClientsCache();
     return newClient;
   },
 
-  async getClients() {
+  async saveClientsBatch(clientsList: any[]) {
+    if (clientsList.length === 0) return [];
+    
+    if (isSupabaseConfigured()) {
+      try {
+        const rows = clientsList.map(client => ({
+          nome_completo: client.nome_completo || client.name || client.nome || '',
+          cpf: client.cpf ? client.cpf.replace(/\D/g, '') || null : null,
+          whatsapp: (client.whatsapp || '').replace(/\D/g, ''),
+          data_nascimento: client.data_nascimento || null,
+          lis_score: client.lis_score || 850,
+          canal_origem: client.canal_origem || client.canal || 'loja_fisica',
+          consentimento_marketing: client.consentimento_marketing !== false,
+          temperatura: client.temperatura || 'frio',
+          cep: client.cep || '00000000',
+          logradouro: client.logradouro || null,
+          numero: client.numero || null,
+          bairro: client.bairro || null,
+          cidade: client.cidade || null,
+          estado: client.estado || client.uf || null,
+          email: client.email || null,
+          rg: client.rg || null
+        }));
+
+        const { data, error } = await supabase.from('clientes').insert(rows).select();
+        invalidateClientsCache();
+        if (!error && data) return data;
+      } catch (e) {
+        console.error('Erro ao salvar lote de clientes no Supabase:', e);
+      }
+    }
+
+    // Fallback local
+    const existing = JSON.parse(localStorage.getItem('lis_clientes') || '[]');
+    const newClients = clientsList.map(c => ({
+      ...c,
+      id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9),
+      nome_completo: c.nome_completo || c.name || '',
+      whatsapp: (c.whatsapp || '').replace(/\D/g, ''),
+      criado_em: new Date().toISOString()
+    }));
+    localStorage.setItem('lis_clientes', JSON.stringify([...existing, ...newClients]));
+    invalidateClientsCache();
+    return newClients;
+  },
+
+  async getClients(forceRefresh = false) {
+    if (!forceRefresh && clientsCache && (Date.now() - clientsCache.timestamp < CACHE_TTL_MS)) {
+      return clientsCache.data;
+    }
+
     if (isSupabaseConfigured()) {
       try {
         let { data, error } = await supabase.from('clientes').select('*').order('criado_em', { ascending: false });
@@ -79,7 +139,9 @@ export const storage = {
         }
         if (data) {
           // Mapear nome -> name para compatibilidade com componentes existentes
-          return data.map((c: any) => ({ ...c, name: c.nome || c.nome_completo }));
+          const mapped = data.map((c: any) => ({ ...c, name: c.nome || c.nome_completo }));
+          clientsCache = { data: mapped, timestamp: Date.now() };
+          return mapped;
         }
       } catch (e) {
         console.error('Falha crítica na conexão com o Supabase para clientes:', e);
@@ -87,7 +149,9 @@ export const storage = {
       }
     }
     const clients = JSON.parse(localStorage.getItem('lis_clientes') || '[]');
-    return clients.map((c: any) => ({ ...c, name: c.nome || c.nome_completo || c.name }));
+    const mappedLocal = clients.map((c: any) => ({ ...c, name: c.nome || c.nome_completo || c.name }));
+    clientsCache = { data: mappedLocal, timestamp: Date.now() };
+    return mappedLocal;
   },
 
   async getClientById(id: string) {
@@ -120,6 +184,7 @@ export const storage = {
     if (isSupabaseConfigured()) {
       try {
         const { data, error } = await supabase.from('vendas').insert([sale]).select();
+        invalidateSalesCache();
         if (!error) {
           console.log('Sale saved to Supabase');
           return data;
@@ -141,11 +206,16 @@ export const storage = {
     };
     sales.push(newSale);
     localStorage.setItem('lis_vendas', JSON.stringify(sales));
+    invalidateSalesCache();
     window.dispatchEvent(new CustomEvent('lis_sale_updated'));
     return newSale;
   },
 
-  async getSales() {
+  async getSales(forceRefresh = false) {
+    if (!forceRefresh && salesCache && (Date.now() - salesCache.timestamp < CACHE_TTL_MS)) {
+      return salesCache.data;
+    }
+
     if (isSupabaseConfigured()) {
       try {
         let { data, error } = await supabase.from('vendas').select('*').order('criado_em', { ascending: false });
@@ -162,6 +232,7 @@ export const storage = {
           toast.error('Falha de sincronização com o banco de dados das vendas.');
           throw error;
         }
+        salesCache = { data: data || [], timestamp: Date.now() };
         return data;
       } catch (e: any) {
         console.error('Falha crítica na conexão com o Supabase para vendas:', e);
@@ -169,7 +240,9 @@ export const storage = {
       }
     }
     console.log('Fetching sales from LocalStorage');
-    return JSON.parse(localStorage.getItem('lis_vendas') || '[]');
+    const localSales = JSON.parse(localStorage.getItem('lis_vendas') || '[]');
+    salesCache = { data: localSales, timestamp: Date.now() };
+    return localSales;
   },
 
   // --- CAIXA DIÁRIO ---

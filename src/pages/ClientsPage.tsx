@@ -68,7 +68,7 @@ export default function ClientsPage() {
           const telCol = findCol(['fone', 'telefone', 'celular', 'whatsapp']);
           const dataCol = findCol(['data', 'nascimento', 'cadastro']);
 
-          let importedCount = 0;
+          const clientsToImport = [];
 
           for (let i = headerRowIndex + 1; i < rows.length; i++) {
             const row = rows[i];
@@ -86,7 +86,7 @@ export default function ClientsPage() {
               }
             }
 
-            await storage.saveClient({
+            clientsToImport.push({
               name: String(row[nomeCol]).trim(),
               cpf: cpf,
               whatsapp: whatsapp,
@@ -94,10 +94,13 @@ export default function ClientsPage() {
               lis_score: 850,
               criado_em: getNowISO()
             });
-            importedCount++;
           }
 
-          toast.success(`Importação Concluída: ${importedCount} pacientes/clientes.`, {
+          if (clientsToImport.length > 0) {
+            await storage.saveClientsBatch(clientsToImport);
+          }
+
+          toast.success(`Importação Concluída: ${clientsToImport.length} pacientes/clientes.`, {
             description: 'A base foi atualizada com sucesso.'
           });
           fetchClients();

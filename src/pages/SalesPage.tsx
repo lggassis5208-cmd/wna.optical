@@ -43,9 +43,16 @@ export default function SalesPage() {
       storage.getClients()
     ]);
 
-    // Enriquecer vendas com dados do cliente
-    const enrichedSales = salesData.map((s: any) => {
-      const client = clientsData.find((c: any) => c.id === s.cliente_id || c.cpf === s.paciente_cpf);
+    const clientMap = new Map<string, any>();
+    (clientsData || []).forEach((c: any) => {
+      if (c.id) clientMap.set(c.id, c);
+      if (c.cpf) clientMap.set(String(c.cpf).replace(/\D/g, ''), c);
+    });
+
+    // Enriquecer vendas com dados do cliente com busca O(1)
+    const enrichedSales = (salesData || []).map((s: any) => {
+      const cleanCpf = s.paciente_cpf ? String(s.paciente_cpf).replace(/\D/g, '') : '';
+      const client = (s.cliente_id && clientMap.get(s.cliente_id)) || (cleanCpf && clientMap.get(cleanCpf));
       return {
         ...s,
         cliente_nome: client?.name || s.paciente_nome || s.tecnico || 'Cliente',
