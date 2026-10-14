@@ -6,7 +6,7 @@ import {
   useLocation,
   Outlet
 } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import {
   LayoutDashboard,
   Users,
@@ -19,25 +19,33 @@ import {
   Wallet,
   Package
 } from 'lucide-react';
-import DashboardPage from './pages/DashboardPage';
-import ClientsPage from './pages/ClientsPage';
-import CrmPage from './pages/CrmPage';
-import SalesPage from './pages/SalesPage';
-import AgendaPage from './pages/AgendaPage';
-import CaixaPage from './pages/CaixaPage';
-import LeadsPage from './pages/LeadsPage';
-import FinanceiroPage from './pages/FinanceiroPage';
-import InventoryPage from './pages/InventoryPage';
-import FiscalPage from './pages/FiscalPage';
-import SettingsPage from './pages/SettingsPage';
-import LoginPage from './pages/LoginPage';
-import TestAutomatedPage from './pages/TestAutomatedPage';
+const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const ClientsPage = lazy(() => import('./pages/ClientsPage'));
+const CrmPage = lazy(() => import('./pages/CrmPage'));
+const SalesPage = lazy(() => import('./pages/SalesPage'));
+const AgendaPage = lazy(() => import('./pages/AgendaPage'));
+const CaixaPage = lazy(() => import('./pages/CaixaPage'));
+const LeadsPage = lazy(() => import('./pages/LeadsPage'));
+const FinanceiroPage = lazy(() => import('./pages/FinanceiroPage'));
+const InventoryPage = lazy(() => import('./pages/InventoryPage'));
+const FiscalPage = lazy(() => import('./pages/FiscalPage'));
+const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const TestAutomatedPage = lazy(() => import('./pages/TestAutomatedPage'));
 import ProtectedRoute from './components/ProtectedRoute';
 import SimularImpressaoNota from './components/SimularImpressaoNota';
-import SegmentosPage from './pages/SegmentosPage';
-import CampanhasPage from './pages/CampanhasPage';
-import FichasMedicasPage from './pages/FichasMedicasPage';
-import RecompraPage from './pages/RecompraPage';
+const SegmentosPage = lazy(() => import('./pages/SegmentosPage'));
+const CampanhasPage = lazy(() => import('./pages/CampanhasPage'));
+const FichasMedicasPage = lazy(() => import('./pages/FichasMedicasPage'));
+const RecompraPage = lazy(() => import('./pages/RecompraPage'));
+
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center min-h-[300px]">
+      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary" />
+    </div>
+  );
+}
 import { Eye, RefreshCw } from 'lucide-react';
 import { notificationService } from './lib/notificationService';
 import type { AppNotification } from './lib/notificationService';
@@ -302,7 +310,9 @@ function Layout() {
 
         {/* Page Container */}
         <div className="flex-1 overflow-y-auto p-8">
-          <Outlet />
+          <Suspense fallback={<PageLoader />}>
+            <Outlet />
+          </Suspense>
         </div>
       </main>
     </div>
@@ -333,7 +343,7 @@ function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/login" element={<LoginPage />} />
+        <Route path="/login" element={<Suspense fallback={<PageLoader />}><LoginPage /></Suspense>} />
         {import.meta.env.DEV && (
           <Route path="/dev/print-test" element={<SimularImpressaoNota />} />
         )}
