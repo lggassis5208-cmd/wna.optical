@@ -351,6 +351,31 @@ export default function ClientsPage() {
           </table>
         </div>
       </div>
+
+      {/* Modais de Clientes e Prontuário */}
+      <ClientModal 
+        isOpen={isModalOpen} 
+        onClose={() => {
+          setIsModalOpen(false);
+          fetchClients();
+        }} 
+      />
+
+      <ClientProfileModal 
+        isOpen={profileModalOpen} 
+        onClose={() => {
+          setProfileModalOpen(false);
+          fetchClients();
+        }} 
+        clientId={selectedClientId} 
+      />
+
+      <PrintPatientListModal 
+        isOpen={printModalOpen} 
+        onClose={() => setPrintModalOpen(false)} 
+        patients={filteredClients} 
+      />
     </div>
   );
 }
+

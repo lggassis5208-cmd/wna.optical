@@ -1,10 +1,14 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { Pool } from 'pg';
-import * as bcrypt from 'bcryptjs';
-import * as jwt from 'jsonwebtoken';
+import * as bcryptModule from 'bcryptjs';
+import * as jwtModule from 'jsonwebtoken';
+
+const bcryptLib: any = (bcryptModule as any).default || bcryptModule;
+const jwtLib: any = (jwtModule as any).default || jwtModule;
 
 const connectionString = process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_IUO8NdES9lRB@ep-spring-art-ayncu70h-pooler.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require';
 const JWT_SECRET = process.env.JWT_SECRET || 'oticalis-neon-jwt-secret-2026';
+
 
 let pool: Pool | null = null;
 function getPool() {
@@ -59,7 +63,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(403).json({ error: 'Usuário inativo. Contate o administrador.' });
       }
 
-      const validPassword = await bcrypt.compare(password, user.senha_hash);
+      const validPassword = await bcryptLib.compare(password, user.senha_hash);
       if (!validPassword) {
         return res.status(401).json({ error: 'Credenciais inválidas.' });
       }
@@ -72,7 +76,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         role: user.role
       };
 
-      const token = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: '7d' });
+      const token = jwtLib.sign(tokenPayload, JWT_SECRET, { expiresIn: '7d' });
 
       return res.status(200).json({
         user: tokenPayload,
@@ -98,7 +102,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: 'Este e-mail já está cadastrado.' });
       }
 
-      const senhaHash = await bcrypt.hash(password, 10);
+      const senhaHash = await bcryptLib.hash(password, 10);
       const nomeUsuario = nome || email.split('@')[0];
 
       const insertResult = await getPool().query(
@@ -107,7 +111,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       );
 
       const newUser = insertResult.rows[0];
-      const token = jwt.sign(newUser, JWT_SECRET, { expiresIn: '7d' });
+      const token = jwtLib.sign(newUser, JWT_SECRET, { expiresIn: '7d' });
 
       return res.status(200).json({
         user: newUser,
@@ -128,7 +132,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       try {
-        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        const decoded = jwtLib.verify(token, JWT_SECRET) as any;
         return res.status(200).json({
           session: {
             access_token: token,
